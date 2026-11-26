@@ -3,7 +3,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 // 음성 대화(WebRTC). 음성은 브라우저끼리 직접 주고받고, 서버는 연결 정보(offer·answer·ICE 후보)만 전달한다.
 // 같은 방에서 음성에 참여한 사람과 한 명씩 연결한다(메시). 두 사람 중 이름이 사전순으로 앞서는 쪽이 연결을 제안해
 // 양쪽이 동시에 제안하는 충돌을 막는다. 서버 규약은 AI2-BE의 PROTOCOL.md "음성 대화"에 있다.
-const iceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
+// STUN·TURN 서버는 음성 참여 때 서버가 voiceConfig로 알려 준다. 휴대폰 데이터망처럼 직접 연결이 막힌 곳에서는
+// TURN(중계)이 있어야 목소리가 오간다. 받기 전까지는 공개 STUN만 쓴다.
+const defaultIceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
+// 주소 끝에 ?relay=1을 붙이면 중계(TURN)로만 연결한다. TURN 설정이 맞는지 시험할 때 쓴다.
+const relayOnly = new URLSearchParams(location.search).get('relay') === '1';
+/** 연결이 'disconnected'로 이만큼 머물면 깨진 것으로 보고 다시 맺는다(네트워크 전환 등). */
+const reconnectAfterMs = 4000;
 const speakingThreshold = 0.02;
 
 function levelOf(analyser, samples) {
@@ -40,6 +46,10 @@ export function useVoice({ game, send, signals, shareLevel = true }) {
   const [error, setError] = useState('');
   const [speaking, setSpeaking] = useState({});
   const [, redraw] = useState(0);
+  /** 깨진 연결을 다시 맺을 때마다 올려 연결 맞추기를 다시 돌린다. */
+  const [reconnects, setReconnects] = useState(0);
+  const iceServers = useRef(defaultIceServers);
+  iceServers.current = game.voiceIceServers ?? defaultIceServers;
   const refresh = useCallback(() => redraw(n => n + 1), []);
 
   const signal = useCallback((label, data) => send('VOICE SIGNAL ' + label + ' ' + JSON.stringify(data)), [send]);
@@ -47,6 +57,7 @@ export function useVoice({ game, send, signals, shareLevel = true }) {
   const closePeer = useCallback(label => {
     const peer = peers.current.get(label);
     if (!peer) return;
+    clearTimeout(peer.timer);
     peer.pc.close();
     peer.audio?.remove();
     peers.current.delete(label);
@@ -86,12 +97,25 @@ export function useVoice({ game, send, signals, shareLevel = true }) {
   }, [refresh, tryPlay]);
 
   const makePeer = useCallback(label => {
-    const pc = new RTCPeerConnection({ iceServers });
+    const pc = new RTCPeerConnection({ iceServers: iceServers.current, iceTransportPolicy: relayOnly ? 'relay' : 'all' });
     local.current.stream.getTracks().forEach(track => pc.addTrack(track, local.current.stream));
     pc.onicecandidate = event => { if (event.candidate) signal(label, { candidate: event.candidate }); };
     pc.ontrack = event => attachAudio(label, event.streams[0]);
-    pc.onconnectionstatechange = refresh;
-    peers.current.set(label, { pc, audio: null, analyser: null, pending: [] });
+    const peer = { pc, audio: null, analyser: null, pending: [], timer: null };
+    const rebuild = () => {
+      if (peers.current.get(label) !== peer) return;
+      peer.pc.close();
+      peer.audio?.remove();
+      peers.current.delete(label);
+      setReconnects(n => n + 1);
+    };
+    pc.onconnectionstatechange = () => {
+      clearTimeout(peer.timer);
+      if (pc.connectionState === 'failed') rebuild();
+      else if (pc.connectionState === 'disconnected') peer.timer = setTimeout(rebuild, reconnectAfterMs);
+      refresh();
+    };
+    peers.current.set(label, peer);
     return pc;
   }, [signal, attachAudio, refresh]);
 
@@ -231,7 +255,7 @@ export function useVoice({ game, send, signals, shareLevel = true }) {
       }
     }
     refresh();
-  }, [joined, members, you, makePeer, closePeer, signal, refresh]);
+  }, [joined, members, you, makePeer, closePeer, signal, refresh, reconnects]);
 
   // 재접속하면 서버는 음성 참여를 지우므로 다시 참여를 알리고, 끊긴 연결은 새로 맺는다.
   const wasConnected = useRef(connected);
