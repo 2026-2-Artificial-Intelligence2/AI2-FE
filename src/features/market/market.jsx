@@ -74,6 +74,9 @@ function Account({ game, name, active, send }) {
       <p className="text-sm text-ui-secondary">평가 손익 <b className={movement(openProfit)}>{signed(openProfit, won)}</b>
         {' · '}확정 손익 <b className={movement(portfolio.realizedWon)}>{signed(portfolio.realizedWon, won)}</b></p>
     </div>
+    {tab === tabNames[1] && game.actionErrors.CANCEL && <p role="alert" className="mt-2 text-sm text-rose-700 dark:text-rose-300">
+      {game.actionErrors.CANCEL.message}
+    </p>}
     <div className="mt-3 overflow-x-auto">
       <table className="data-table">
         <thead><tr>{headings.map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead>

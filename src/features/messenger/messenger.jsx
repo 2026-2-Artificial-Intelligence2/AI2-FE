@@ -15,7 +15,8 @@ function Channel({ active, title, detail, marker, onSelect }) {
 }
 
 export function Messenger({ game, send, playing, closing, onDismiss, docked = false, initialChannel = group }) {
-  const { room, chats, connected, lastError, leakReceipt } = game;
+  const { room, chats, connected, actionErrors, leakReceipt } = game;
+  const lastError = actionErrors.CHAT;
   const me = room.youLabel;
   const members = (room.members ?? []).filter(member => member.label !== me);
   const [channel, setChannel] = useState(initialChannel);
@@ -81,7 +82,7 @@ export function Messenger({ game, send, playing, closing, onDismiss, docked = fa
   const heading = anonymous ? '익명 찌라시' : direct ? selected + '님과의 귓속말' : '단체방';
   const Frame = docked ? 'section' : 'dialog';
   return <Frame ref={dialog} id="messenger" aria-labelledby="messenger-title"
-    className={docked ? 'panel lobby-messenger flex h-[27rem] min-w-0 flex-col overflow-hidden' :
+    className={docked ? 'panel lobby-messenger flex min-w-0 flex-col overflow-hidden' :
       'panel messenger-window fixed inset-auto right-3 bottom-3 m-0 shadow-2xl backdrop:bg-slate-900/15 sm:right-6 sm:bottom-6'}
     style={!docked && size ? { '--window-width': size.width + 'px', '--window-height': size.height + 'px' } : undefined}
     onCancel={docked ? undefined : event => { event.preventDefault(); onDismiss(); }}
@@ -147,7 +148,7 @@ export function Messenger({ game, send, playing, closing, onDismiss, docked = fa
               }}
               placeholder={anonymous ? '찌라시 제목' : '메시지 입력'} />
             <button type="submit" disabled={!connected || closing || !canSubmit || Boolean(pending || (anonymous && leakReceipt))}
-              className="rounded-lg bg-blue-700 px-4 text-sm font-bold text-white">{anonymous ? '소문 보내기' : '전송'}</button>
+              className="primary-action rounded-lg px-4 text-sm font-bold">{anonymous ? '소문 보내기' : '전송'}</button>
           </div>
           <div className="flex justify-between gap-3 text-xs text-ui-secondary">
             <p role="status">{feedback?.channel === selected && feedback.text}</p>

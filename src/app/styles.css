@@ -78,6 +78,9 @@
 @layer components {
   .panel { @apply rounded-xl border border-ui-border bg-ui-surface shadow-xs; }
   .control { @apply rounded-lg border border-ui-input bg-ui-surface px-3 py-1.5 text-sm font-semibold hover:bg-ui-subtle; }
+  .primary-action {
+    @apply bg-indigo-700 text-white enabled:hover:bg-indigo-800 dark:bg-[#3d3b50] dark:enabled:hover:bg-[#4a4860];
+  }
   .field { @apply rounded-lg border border-ui-input bg-ui-surface px-3 py-2 text-sm tabular-nums; }
   .segments { @apply inline-flex rounded-lg bg-ui-muted p-0.5 text-sm; }
   .segments button { @apply rounded-md px-3 py-1.5 font-semibold text-ui-secondary; }

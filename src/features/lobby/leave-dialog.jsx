@@ -3,7 +3,8 @@ import { Dialog } from '../../shared/ui/dialog.jsx';
 
 export function LeaveDialog({ game, host, send, onDismiss }) {
   const [request, setRequest] = useState(null);
-  const { connected, room, result, lastError } = game;
+  const { connected, room, result, actionErrors } = game;
+  const lastError = actionErrors.LEAVE;
   const inRound = Boolean(room.room.startedAt && !result);
   const pending = Boolean(request && connected && lastError === request.error);
 

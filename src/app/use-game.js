@@ -4,8 +4,38 @@ import { footsteps, cough } from '../shared/audio/spatial-audio.js';
 const seatKey = 'officeStockSeat';
 const initial = {
   stocks: [], candles: {}, orders: [], trades: [], history: [], chats: [],
-  status: '연결 중…',
+  status: '연결 중…', actionErrors: {},
 };
+
+// The server sends an unlabelled error or a command-specific success packet.
+function commandResponse(command) {
+  const [verb, target, symbol, price, quantity] = command.split(' ', 5);
+  switch (verb) {
+    case 'CREATE':
+    case 'JOIN': return [verb, message => message.type === 'state'];
+    case 'START': return [verb, message => message.type === 'state' && message.room.startedAt];
+    case 'RESTART': return [verb, message => message.type === 'state' && !message.room.startedAt];
+    case 'LENGTH': return [verb, message => message.type === 'state' && message.sessionSeconds === Number(target) * 60];
+    case 'WORK': return [verb, message => message.type === 'work' && message.desk.task.number >= Number(target)];
+    case 'LIMIT': return ['ORDER:' + symbol, message => message.type === 'orders' &&
+      message.orders.some(order => order.symbol === symbol && order.limitWon === Number(price) &&
+        order.quantity === Number(quantity) && order.side === (target === 'BUY' ? '매수' : '매도'))];
+    case 'BUY':
+    case 'BUYWON':
+    case 'SELL': return ['ORDER:' + target, message => message.type === 'fill' && !message.limit && !message.forced &&
+      message.symbol === target && message.side.endsWith(verb === 'SELL' ? '매도' : '매수')];
+    case 'CANCEL': return [verb, message => message.type === 'orders' && !message.orders.some(order => order.id === Number(target))];
+    case 'LOAN': return [verb, message => message.type === 'work' && message.desk.balance.loanRepayWon > 0];
+    case 'LEAVE': return [verb, message => message.type === 'closed'];
+    case 'CHAT': return [verb, (message, you) => message.type === 'chat' && message.message.from === you &&
+      (message.message.to ?? 'ALL') === target && message.message.text === command.slice(6 + target.length)];
+    case 'LEAK_ARTICLE': return ['CHAT', message => message.type === 'leakSent'];
+    case 'SWITCH':
+    case 'MESSENGER': return ['GENERAL', message => message.type === 'view'];
+    case 'NEWS': return ['NEWS', message => message.type === 'newsHistory'];
+    default: return null;
+  }
+}
 
 function mergeCandles(history, latest) {
   const next = { ...history };
@@ -20,16 +50,20 @@ function mergeCandles(history, latest) {
 
 function reduce(game, message, receivedAt) {
   switch (message.type) {
-    case 'state':
+    case 'state': {
+      const sameRoom = game.room?.code === message.code;
+      const sameRound = sameRoom && game.room.round === message.round;
       return {
         ...(message.room.startedAt ? game : {
-          ...initial, chats: game.room?.code === message.code ? game.chats : [],
-          micLevels: game.room?.code === message.code ? game.micLevels : undefined,
+          ...initial, chats: sameRoom ? game.chats : [],
+          micLevels: sameRoom ? game.micLevels : undefined,
+          actionErrors: sameRound ? game.actionErrors : initial.actionErrors,
         }),
-        status: message.room.startedAt ? (game.result ? game.status : '게임 진행 중') : '시작 대기 중',
+        status: '',
         connected: true,
         room: message,
       };
+    }
     case 'chart': return { ...game, candles: message.candles, candleSeconds: message.candleSeconds };
     case 'catalog': return { ...game, stocks: message.stocks, feeBps: message.feeBps, margin: message.margin, loan: message.loan };
     case 'market': return {
@@ -41,7 +75,6 @@ function reduce(game, message, receivedAt) {
       return {
         ...game,
         desk: message.desk,
-        status: advanced ? '게임 진행 중' : game.status,
         workCompletion: advanced
           ? { rewardWon: message.desk.balance.workIncomeWon - game.desk.balance.workIncomeWon }
           : game.workCompletion,
@@ -66,12 +99,16 @@ function reduce(game, message, receivedAt) {
       return { ...game, micLevels };
     }
     case 'workError': return { ...game, workError: message };
-    case 'error': return { ...game, lastError: message, status: message.message };
+    case 'error': return {
+      ...game, lastError: message, actionErrors: { ...game.actionErrors, [message.scope]: message },
+    };
+    case 'notice': return { ...game, notice: message };
+    case 'replaced': return { ...game, status: message.message };
     case 'dismissNews': return { ...game, popup: null };
     case 'newsHistory': return { ...game, history: message.items };
     case 'closed':
     case 'resumeFailed': return { ...initial, connected: true, status: message.message };
-    default: return message.message ? { ...game, status: message.message } : game;
+    default: return game;
   }
 }
 
@@ -79,10 +116,18 @@ export function useGame() {
   const [game, setGame] = useState(initial);
   const socket = useRef(null);
   const office = useRef(null);
-  const workRequest = useRef(null);
+  const pendingCommands = useRef([]);
   const send = useCallback(command => {
     if (socket.current?.readyState !== WebSocket.OPEN) return false;
-    if (command.startsWith('WORK ')) workRequest.current = Number(command.split(' ', 3)[1]);
+    const response = commandResponse(command);
+    if (response) {
+      const [scope, matches] = response;
+      pendingCommands.current.push({ scope, matches, sentAt: performance.now() });
+      if (scope !== 'WORK' && scope !== 'LOAN' && scope !== 'LEAVE' && scope !== 'CHAT') {
+        setGame(game => game.actionErrors[scope]
+          ? { ...game, actionErrors: { ...game.actionErrors, [scope]: undefined } } : game);
+      }
+    }
     socket.current.send(command);
     return true;
   }, []);
@@ -98,6 +143,7 @@ export function useGame() {
     let resuming = false;
     let retryTimer;
     let popupTimer;
+    let noticeTimer;
     let retries = 0;
     let newsNumber = 0;
     let lastStep = -1;
@@ -123,19 +169,28 @@ export function useGame() {
       connection.onmessage = event => {
         if (stopped) return;
         let message = JSON.parse(event.data);
-        if (workRequest.current !== null) {
-          if (message.type === 'error') {
-            message = { ...message, type: 'workError' };
-            workRequest.current = null;
-          } else if ((message.type === 'work' && message.desk.task.number > workRequest.current) ||
-              ['meeting', 'result', 'closed', 'resumeFailed'].includes(message.type)) {
-            workRequest.current = null;
-          }
-        }
         const receivedAt = performance.now();
+        const pending = pendingCommands.current;
+        while (pending.length && receivedAt - pending[0].sentAt >= 15000) pending.shift();
+        if (message.type === 'error') {
+          const scope = pending.shift()?.scope ?? 'GENERAL';
+          message = { ...message, scope, type: scope === 'WORK' ? 'workError' : 'error' };
+          if (resuming && !pending.length) {
+            resuming = false;
+            message = { ...message, type: 'resumeFailed' };
+          }
+        } else {
+          const index = pending.findIndex(request => request.matches(message, youLabel));
+          if (index !== -1) pending.splice(index, 1);
+        }
+        if (message.type === 'notice') {
+          clearTimeout(noticeTimer);
+          noticeTimer = setTimeout(() => setGame(game => ({ ...game, notice: null })), 10000);
+        }
         if (message.type === 'state') {
           sessionStorage.setItem(seatKey, JSON.stringify({ code: message.code, token: message.token }));
           retries = 0;
+          if (!message.room.startedAt) resuming = false;
           youLabel = message.youLabel;
           roundSeconds = message.sessionSeconds;
           if (roomStartedAt !== message.room.startedAt) {
@@ -150,6 +205,7 @@ export function useGame() {
           }
         }
         if (message.type === 'closed' || message.type === 'resumeFailed') {
+          pendingCommands.current = [];
           sessionStorage.removeItem(seatKey);
           office.current = null;
         }
@@ -173,7 +229,7 @@ export function useGame() {
             resuming = false;
             newsNumber = Math.max(newsNumber, message.newsNumber);
             lastCough = Math.max(lastCough, message.coughBeat);
-            connection.send('NEWS HISTORY');
+            send('NEWS HISTORY');
           }
           if (message.coughBeat > lastCough && message.step) {
             lastCough = message.coughBeat;
@@ -182,7 +238,7 @@ export function useGame() {
           if (message.newsNumber > newsNumber) {
             newsNumber = message.newsNumber;
             popup = { number: message.newsNumber, headline: message.headline, body: message.newsBody, kind: message.newsKind };
-            connection.send('NEWS HISTORY');
+            send('NEWS HISTORY');
             clearTimeout(popupTimer);
             popupTimer = setTimeout(() => setGame(game => ({ ...game, popup: null })), popup.body ? 15000 : 12000);
           }
@@ -194,7 +250,7 @@ export function useGame() {
         });
       };
       connection.onclose = () => {
-        workRequest.current = null;
+        pendingCommands.current = [];
         if (stopped) return;
         const retry = savedSeat() && !replaced && retries < 30;
         setGame(game => ({
@@ -211,9 +267,11 @@ export function useGame() {
       stopped = true;
       clearTimeout(retryTimer);
       clearTimeout(popupTimer);
+      clearTimeout(noticeTimer);
+      pendingCommands.current = [];
       socket.current?.close();
     };
-  }, []);
+  }, [send]);
 
   return { game, send, office, dismissNews };
 }

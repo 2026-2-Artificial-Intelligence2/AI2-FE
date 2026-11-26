@@ -58,7 +58,7 @@ function TradeLog({ trades, you, name }) {
   </section>;
 }
 
-export function Results({ result, name, host, connected, send }) {
+export function Results({ result, name, host, connected, send, restartError }) {
   const { standings, trades, you } = result;
   const [selected, setSelected] = useState(you);
   const mine = standings.find(row => row.player === you);
@@ -74,8 +74,11 @@ export function Results({ result, name, host, connected, send }) {
             {winners.length > 1 ? '공동 1위' : '1위'} · {winners.map(row => playerLabel(row.player, you)).join(', ')}
           </p>}
         </div>
-        {host ? <button id="restart" className="rounded-lg bg-ui-surface px-3 py-2 text-sm font-bold text-ui-text hover:bg-indigo-50 dark:hover:bg-indigo-950"
+        {host ? <div className="space-y-2">
+          <button id="restart" className="rounded-lg bg-ui-surface px-3 py-2 text-sm font-bold text-ui-text hover:bg-indigo-50 dark:hover:bg-indigo-950"
           disabled={!connected} onClick={() => send('RESTART')}>같은 방에서 다시 하기</button>
+          {restartError && <p role="alert" className="text-xs text-rose-200">{restartError}</p>}
+        </div>
           : <p className="text-sm text-slate-300">방장이 다시 하기를 누르면 대기실로 돌아가요.</p>}
       </div>
       {mine && <dl className="mt-6 flex flex-wrap gap-x-10 gap-y-3">

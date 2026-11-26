@@ -33,7 +33,7 @@ export function App() {
   const [monitorVisible, setMonitorVisible] = useState(false);
   const [lastChat, setLastChat] = useState(0);
   const [lastNews, setLastNews] = useState(0);
-  const { connected, room, view, market, desk, result } = game;
+  const { connected, room, view, market, desk, result, actionErrors } = game;
   const microphone = useMicrophone({ connected, roomCode: room?.code, send });
   const seated = view === 'WORK' || view === 'MARKET';
   const messaging = view === 'MESSENGER';
@@ -46,7 +46,7 @@ export function App() {
   const officeActive = computer && Boolean(office.current);
   const desktopShown = !officeActive || officeReady === false || (!looking && monitorVisible);
   const desktopInteractive = desktopShown && view !== 'MEETING';
-  const canOpenLoan = connected && computer && game.loan && desk && !result;
+  const showLoan = computer && game.loan && desk && !result;
   const host = room?.you === room?.room.hostId;
   const name = symbol => game.stocks.find(stock => stock.id === symbol)?.name ?? symbol;
 
@@ -158,8 +158,7 @@ export function App() {
     setLooking(false);
   }
 
-  const gauges = <GameGauges game={game} microphone={microphone} canOpenLoan={canOpenLoan}
-    openLoan={() => setActiveDialog('loan')} />;
+  const gauges = <GameGauges game={game} microphone={microphone} />;
   const messenger = room && messengerOpen && <Messenger key={'messenger-' + room.code + '-' + room.round} game={game}
     send={send} initialChannel={conversation} docked={inLobby} playing={!outsideRound} closing={Boolean(returning)} onDismiss={closeMessenger} />;
 
@@ -168,7 +167,7 @@ export function App() {
       looking={looking} focused={!looking} onReady={setOfficeReady} onReturn={returnToMonitor} />}
     {view === 'MEETING' && <Meeting reason={game.meeting} startedAt={game.meetingStarted} />}
     <main inert={!desktopInteractive} data-monitor={desktopShown}
-      className={(officeActive ? 'game-desktop ' : '') + (!room || inLobby ? 'arrival-page ' : '') + 'min-h-screen'}>
+      className={(officeActive ? 'game-desktop ' : '') + 'min-h-screen'}>
       <div className="mx-auto max-w-[1520px] space-y-4 px-4 py-5 sm:px-7">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-ui-border pb-4">
           <h1 className="text-lg font-extrabold tracking-tight">부장님 몰래</h1>
@@ -178,8 +177,12 @@ export function App() {
               <span aria-hidden="true">{theme === 'dark' ? '☀ 라이트 모드' : '☾ 다크 모드'}</span>
             </button>
             {room && <>
-              {market && !result && <span id="clock" className="mr-2 tabular-nums">퇴근까지 <b>{clock(market.remainingSeconds)}</b>
-                {market.remainingSeconds <= 120 && <span className="ml-2 text-rose-700 dark:text-rose-300">장 마감 임박</span>}</span>}
+              {(market && !result || showLoan) && <div className="flex flex-wrap items-center gap-2">
+                {market && !result && <span id="clock" className="tabular-nums">퇴근까지 <b>{clock(market.remainingSeconds)}</b>
+                  {market.remainingSeconds <= 120 && <span className="ml-2 text-rose-700 dark:text-rose-300">장 마감 임박</span>}</span>}
+                {showLoan && <button type="button" className="control" aria-haspopup="dialog" disabled={!connected}
+                  onClick={() => setActiveDialog('loan')}>{desk.balance.loanRepayWon > 0 ? '대출 내역' : '비상 대출'}</button>}
+              </div>}
               {canOpenMessengerPopup && <button className="control" disabled={!connected} aria-haspopup="dialog"
                 aria-keyshortcuts="M" onClick={openMessenger}>메신저 <KeyHint>M</KeyHint></button>}
               {computer && <>
@@ -195,23 +198,25 @@ export function App() {
             </>}
           </div>
         </header>
-        {!room && <Entry connected={connected} send={send} />}
+        {room && !inLobby && (game.status || actionErrors.GENERAL || (!activeDialog && game.notice)) &&
+          <div role="status" className="panel px-4 py-3 text-sm text-ui-secondary">
+            {game.status || actionErrors.GENERAL?.message || game.notice?.message}
+          </div>}
+        {!room && <Entry connected={connected} send={send} status={game.status}
+          createError={actionErrors.CREATE?.message} joinError={actionErrors.JOIN?.message} />}
         {!room && choiceNeeded && <MicrophonePermission onChoose={choose} />}
-        {inLobby && <div className="lobby-grid">
-          <Lobby key={'lobby-' + room.code + '-' + room.round} game={game} host={host} send={send} />
-          {messenger}
-        </div>}
+        {inLobby && <Lobby key={'lobby-' + room.code + '-' + room.round} game={game} host={host} send={send}
+          messenger={messenger} />}
         {desk && !result && <Work game={game} visible={desktopView === 'WORK'} active={desktopInteractive && view === 'WORK' && !messengerOpen} gauges={gauges} send={send} />}
         {market && !result && <Market visible={desktopView === 'MARKET'} active={desktopInteractive && !messengerOpen && view === 'MARKET'} game={game} name={name} gauges={gauges} theme={theme} send={send} />}
-        {result && <Results result={result} name={name} host={host} connected={connected} send={send} />}
+        {result && <Results result={result} name={name} host={host} connected={connected} send={send} restartError={actionErrors.RESTART?.message} />}
         {!inLobby && messenger}
         {computer && desktopShown && <Notifications game={game} inbox={inbox} toggleInbox={toggleInbox}
           messengerOpen={messengerOpen} openMessenger={openMessenger} lastChat={lastChat} lastNews={lastNews} dismissNews={dismissNews} />}
-        {activeDialog === 'loan' && computer && game.loan && desk && !result &&
+        {activeDialog === 'loan' && showLoan &&
           <LoanDialog game={game} send={send} onDismiss={() => setActiveDialog(null)} />}
         {activeDialog === 'leave' && room && view !== 'MEETING' &&
           <LeaveDialog game={game} host={host} send={send} onDismiss={() => setActiveDialog(null)} />}
-        <p id="status" role="status" className="text-sm text-ui-secondary">{game.status}</p>
       </div>
     </main>
   </>;
