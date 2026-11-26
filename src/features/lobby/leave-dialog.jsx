@@ -19,8 +19,8 @@ export function LeaveDialog({ game, host, send, onDismiss }) {
 
   return <Dialog id="leave-dialog" title="방을 나갈까요?" pending={pending} onDismiss={onDismiss}>
     <div className="space-y-4 p-5">
-      <p className="text-sm leading-relaxed text-slate-700">{description}</p>
-      {request && request.error !== lastError && lastError?.message && <p className="text-sm text-rose-700" role="alert">{lastError.message}</p>}
+      <p className="text-sm leading-relaxed text-ui-secondary">{description}</p>
+      {request && request.error !== lastError && lastError?.message && <p className="text-sm text-rose-700 dark:text-rose-300" role="alert">{lastError.message}</p>}
       <div className="flex justify-end gap-2">
         <button type="button" className="control" disabled={pending} onClick={onDismiss}>계속하기</button>
         <button type="button" disabled={pending || !connected} className="rounded-lg bg-rose-700 px-4 py-2 text-sm font-bold text-white hover:bg-rose-800"

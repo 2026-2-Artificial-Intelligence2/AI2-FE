@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {box, oval} from '../../shared/scene/character.js';
+import { makeWindowSky } from './window-sky.js';
 
 function painted(width,height,paint) {
   const canvas=document.createElement('canvas');
@@ -41,21 +42,12 @@ function officeScreen(chart) {
 
 export function furnish(scene) {
   const screens=[officeScreen(false),officeScreen(true)];
-  const skyline=painted(1024,320,(c,w,h)=>{
-    const g=c.createLinearGradient(0,0,0,h);g.addColorStop(0,'#bbd8e4');g.addColorStop(1,'#ffddd0');
-    c.fillStyle=g;c.fillRect(0,0,w,h);
-    for(let layer=0;layer<2;layer++)for(let i=0;i<26;i++){
-      const x=i*49-layer*23,y=110+layer*60+Math.sin(i*5.4+layer)*48;
-      c.fillStyle=layer?'#b9b5c2':'#d5c6ca';c.fillRect(x,y,36+(i%3)*7,h-y);
-      c.fillStyle=layer?'#bcc9c8':'#d1d7d5';
-      for(let a=5;a<34;a+=10)for(let b=y+10;b<h;b+=15)c.fillRect(x+a,b,4,7);
-    }
-  });
+  const skyline = makeWindowSky();
   for(const z of [-5.5,5.5]){
     const face=-Math.sign(z);
     for(const x of [-4,0,4,8]){
       box(scene,[3.35,1.82,0.12],[x,2.02,z+face*0.095],0x657777);
-      panel(scene,x,2.02,z+face*0.162,3.22,1.69,skyline,face);
+      panel(scene,x,2.02,z+face*0.162,3.22,1.69,skyline.material,face);
       for(const dx of [-0.81,0,0.81])box(scene,[0.034,1.68,0.04],[x+dx,2.02,z+face*0.18],0xe4dfd2);
       box(scene,[3.55,0.065,0.28],[x,1.14,z+face*0.17],0xd1b898);
       for(let i=0;i<3;i++)box(scene,[3.25,0.036,0.07],[x,2.8-i*0.08,z+face*0.2],0xf4ead8);
@@ -76,7 +68,7 @@ export function furnish(scene) {
       leaf.rotation.set(Math.sin(angle)*0.65,angle,Math.cos(angle)*0.65);
     }
   }
-  return function dressDesk(x,z,i){
+  function dressDesk(x,z,i){
     const f=-Math.sign(z),dz=z+0.65*f;
     panel(scene,x,1.1,dz-f*0.048,0.596,0.315,screens[i%2],-f);
     for(let j=0;j<4;j++)box(scene,[0.385,0.006,0.014],[x,0.837,dz-f*(0.225+j*0.026)],0x8a9798);
@@ -104,4 +96,5 @@ export function furnish(scene) {
       box(scene,[0.53,0.046,0.063],[x,0.072,z],0x454f53).rotation.y=angle;
     }
   };
+  return { dressDesk, updateSky: skyline.update };
 }

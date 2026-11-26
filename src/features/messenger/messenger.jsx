@@ -8,9 +8,9 @@ const rumor = 'LEAK';
 
 function Channel({ active, title, detail, marker, onSelect }) {
   return <button type="button" aria-pressed={active} onClick={onSelect}
-    className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm hover:bg-slate-100 aria-pressed:bg-blue-50 aria-pressed:text-blue-950">
-    <span aria-hidden="true" className="hidden h-7 w-7 shrink-0 place-items-center sm:grid rounded-lg bg-white text-xs font-bold ring-1 ring-slate-200">{marker}</span>
-    <span><span className="block font-semibold">{title}</span><span className="block text-xs text-slate-600">{detail}</span></span>
+    className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm hover:bg-ui-muted aria-pressed:bg-blue-50 dark:aria-pressed:bg-[var(--dark-selection)] aria-pressed:text-blue-950 dark:aria-pressed:text-blue-100">
+    <span aria-hidden="true" className="hidden h-7 w-7 shrink-0 place-items-center sm:grid rounded-lg bg-ui-surface text-xs font-bold ring-1 ring-ui-border">{marker}</span>
+    <span><span className="block font-semibold">{title}</span><span className="block text-xs text-ui-secondary">{detail}</span></span>
   </button>;
 }
 
@@ -81,10 +81,10 @@ export function Messenger({ game, send, playing, closing, onDismiss, docked = fa
   const heading = anonymous ? '익명 찌라시' : direct ? selected + '님과의 귓속말' : '단체방';
   const Frame = docked ? 'section' : 'dialog';
   return <Frame ref={dialog} id="messenger" aria-labelledby="messenger-title"
-    className={docked ? 'panel flex min-h-[25rem] flex-col overflow-hidden' :
+    className={docked ? 'panel lobby-messenger flex h-[27rem] min-w-0 flex-col overflow-hidden' :
       'panel messenger-window fixed inset-auto right-3 bottom-3 m-0 shadow-2xl backdrop:bg-slate-900/15 sm:right-6 sm:bottom-6'}
     style={!docked && size ? { '--window-width': size.width + 'px', '--window-height': size.height + 'px' } : undefined}
-    onCancel={event => { event.preventDefault(); onDismiss(); }}
+    onCancel={docked ? undefined : event => { event.preventDefault(); onDismiss(); }}
     onKeyDown={event => {
       if (playing && event.key === 'Tab' && !event.shiftKey && !event.ctrlKey && !event.altKey &&
           !event.metaKey && !event.nativeEvent.isComposing) {
@@ -93,16 +93,16 @@ export function Messenger({ game, send, playing, closing, onDismiss, docked = fa
       }
     }}>
     {!docked && <ResizeGrip frame={dialog} label="메신저 창 크기 조절" topLeft onResize={setSize} />}
-    <header className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-slate-100 py-2 pr-3 pl-8">
+    <header className={'flex shrink-0 items-center justify-between gap-3 border-b border-ui-border bg-ui-muted py-2 pr-3 ' + (docked ? 'pl-3' : 'pl-8')}>
       <div className="flex items-center gap-2">
         <h2 id="messenger-title" className="text-sm font-bold">사내 메신저</h2>
-        <span className="text-xs text-slate-600">{me}</span>
+        <span className="text-xs text-ui-secondary">{me}</span>
       </div>
-      <button type="button" aria-label="메신저 닫기" aria-keyshortcuts="Escape" disabled={closing}
-        className="control px-2 py-0.5" onClick={() => onDismiss()}>× <KeyHint>Esc</KeyHint></button>
+      {!docked && <button type="button" aria-label="메신저 닫기" aria-keyshortcuts="Escape" disabled={closing}
+        className="control px-2 py-0.5" onClick={() => onDismiss()}>× <KeyHint>Esc</KeyHint></button>}
     </header>
     <div className="grid min-h-0 flex-1 grid-cols-[clamp(6.5rem,26%,10.5rem)_minmax(0,1fr)]">
-      <aside className="overflow-y-auto border-r border-slate-200 bg-slate-50 p-1 sm:p-2">
+      <aside className="overflow-y-auto border-r border-ui-border bg-ui-subtle p-1 sm:p-2">
         <nav aria-label="대화 목록" className="space-y-1">
           <Channel active={selected === group} title="단체방" detail={members.length + 1 + '명'} marker="#" onSelect={() => setChannel(group)} />
           {members.map(member => <Channel key={member.label} active={selected === member.label} title={member.label}
@@ -112,27 +112,27 @@ export function Messenger({ game, send, playing, closing, onDismiss, docked = fa
         </nav>
       </aside>
       <div className="flex min-h-0 min-w-0 flex-col">
-        <header className="shrink-0 border-b border-slate-200 px-3 py-2.5">
+        <header className="shrink-0 border-b border-ui-border px-3 py-2.5">
           <h3 className="font-bold">{heading}</h3>
-          <p className="mt-0.5 text-xs text-slate-600">{anonymous ? '모두의 뉴스 알림에 올라가며 작성자는 퇴근 후 공개됩니다.'
+          <p className="mt-0.5 text-xs text-ui-secondary">{anonymous ? '모두의 뉴스 알림에 올라가며 작성자는 퇴근 후 공개됩니다.'
             : direct ? '나와 상대방만 볼 수 있습니다.' : '같은 방에 있는 직원 모두가 볼 수 있습니다.'}</p>
         </header>
-        {anonymous ? <div className="flex min-h-0 flex-1 items-center overflow-y-auto px-3 py-4 text-sm text-slate-600">
+        {anonymous ? <div className="flex min-h-0 flex-1 items-center overflow-y-auto px-3 py-4 text-sm text-ui-secondary">
           <p>{leakReceipt?.message ?? '제목과 본문을 작성하세요.'}</p>
         </div> : <div ref={list} role="log" aria-label={heading + ' 메시지'}
-          className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto bg-blue-50/45 p-3">
+          className={'flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3 ' + (docked ? 'bg-ui-subtle' : 'bg-blue-50/45 dark:bg-ui-desktop')}>
           {messages.length ? messages.map(message => {
             const mine = message.from === me;
             return <article key={message.id} className={mine ? 'max-w-[90%] self-end text-right' : 'max-w-[90%] self-start'}>
-              <p className="mb-1 text-xs text-slate-500">{mine ? '나' : message.from}
+              <p className="mb-1 text-xs text-ui-caption">{mine ? '나' : message.from}
                 {message.second >= 0 && <span className="ml-2 tabular-nums">{clock(message.second)}</span>}</p>
               <p className={'inline-block max-w-full rounded-xl px-3 py-2 text-left text-sm whitespace-pre-wrap [overflow-wrap:anywhere] ' +
-                (mine ? 'bg-blue-700 text-white' : 'bg-white text-slate-900 ring-1 ring-slate-200')}>{message.text}</p>
+                (mine ? 'bg-blue-700 text-white dark:bg-[#394251] dark:text-[#e0e4ec]' : 'bg-ui-surface text-ui-text ring-1 ring-ui-border')}>{message.text}</p>
             </article>;
-          }) : <p className="m-auto text-sm text-slate-500">아직 대화가 없습니다.</p>}
+          }) : <p className="m-auto text-sm text-ui-caption">아직 대화가 없습니다.</p>}
         </div>}
-        <form onSubmit={submit} className="shrink-0 space-y-2 border-t border-slate-200 p-2.5">
-          {anonymous && <label className="block text-xs font-semibold text-slate-700">
+        <form onSubmit={submit} className="shrink-0 space-y-2 border-t border-ui-border p-2.5">
+          {anonymous && <label className="block text-xs font-semibold text-ui-secondary">
             본문 <span className="font-normal">{bodyLength} / 300</span>
             <textarea aria-label="찌라시 본문" rows={3} className="field mt-1 w-full resize-y"
               value={articleBody} disabled={!connected || closing || Boolean(pending || leakReceipt)}
@@ -140,7 +140,7 @@ export function Messenger({ game, send, playing, closing, onDismiss, docked = fa
           </label>}
           <div className="flex gap-2">
             <input aria-label={anonymous ? '찌라시 제목' : '메시지'} className="field min-w-0 flex-1"
-              value={draft} autoFocus disabled={!connected || closing || Boolean(anonymous && leakReceipt)}
+              value={draft} autoFocus={!docked} disabled={!connected || closing || Boolean(anonymous && leakReceipt)}
               onChange={event => setDrafts({ ...drafts, [selected]: event.target.value })}
               onKeyDown={event => {
                 if (event.key === 'Enter' && event.nativeEvent.isComposing) event.preventDefault();
@@ -149,9 +149,9 @@ export function Messenger({ game, send, playing, closing, onDismiss, docked = fa
             <button type="submit" disabled={!connected || closing || !canSubmit || Boolean(pending || (anonymous && leakReceipt))}
               className="rounded-lg bg-blue-700 px-4 text-sm font-bold text-white">{anonymous ? '소문 보내기' : '전송'}</button>
           </div>
-          <div className="flex justify-between gap-3 text-xs text-slate-600">
+          <div className="flex justify-between gap-3 text-xs text-ui-secondary">
             <p role="status">{feedback?.channel === selected && feedback.text}</p>
-            <span className={'shrink-0 tabular-nums ' + (length > limit ? 'text-rose-700' : '')}>{length} / {limit}</span>
+            <span className={'shrink-0 tabular-nums ' + (length > limit ? 'text-rose-700 dark:text-rose-300' : '')}>{length} / {limit}</span>
           </div>
         </form>
       </div>

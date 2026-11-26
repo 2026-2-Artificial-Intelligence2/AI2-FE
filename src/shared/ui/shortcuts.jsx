@@ -25,7 +25,7 @@ export function useShortcuts(enabled, actions) {
 }
 
 export function KeyHint({ children }) {
-  return <kbd aria-hidden="true" className="ml-1 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-normal text-slate-600">
+  return <kbd aria-hidden="true" className="ml-1 rounded border border-ui-border bg-ui-surface px-1.5 py-0.5 text-[10px] font-normal text-ui-secondary">
     {children}
   </kbd>;
 }

@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useGame } from './use-game.js';
+import { useTheme } from './use-theme.js';
+import { MicrophonePermission, useMicrophonePreference } from './microphone-permission.jsx';
+import { useMicrophone } from './use-microphone.js';
+import { GameGauges } from './game-gauges.jsx';
 import { enableSound } from '../shared/audio/spatial-audio.js';
 import { clock } from '../shared/format.js';
 import { Market } from '../features/market/market.jsx';
@@ -16,6 +20,8 @@ import { KeyHint, useShortcuts } from '../shared/ui/shortcuts.jsx';
 
 export function App() {
   const { game, send, office, dismissNews } = useGame();
+  const { theme, toggleTheme } = useTheme();
+  const { choiceNeeded, choose } = useMicrophonePreference();
   const [inbox, setInbox] = useState(false);
   const [activeDialog, setActiveDialog] = useState(null);
   const [conversation, setConversation] = useState('ALL');
@@ -28,13 +34,15 @@ export function App() {
   const [lastChat, setLastChat] = useState(0);
   const [lastNews, setLastNews] = useState(0);
   const { connected, room, view, market, desk, result } = game;
+  const microphone = useMicrophone({ connected, roomCode: room?.code, send });
   const seated = view === 'WORK' || view === 'MARKET';
   const messaging = view === 'MESSENGER';
   const computer = seated || messaging;
-  const outsideRound = Boolean(room && (!room.room.startedAt || result));
-  const messengerOpen = messaging || Boolean(returning) || (outsideRound && lobbyMessenger);
-  const desktopView = messaging || returning ? underMessenger : view;
   const inLobby = Boolean(room && !room.room.startedAt);
+  const outsideRound = Boolean(room && (inLobby || result));
+  const canOpenMessengerPopup = outsideRound && !inLobby;
+  const messengerOpen = inLobby || messaging || Boolean(returning) || (canOpenMessengerPopup && lobbyMessenger);
+  const desktopView = messaging || returning ? underMessenger : view;
   const officeActive = computer && Boolean(office.current);
   const desktopShown = !officeActive || officeReady === false || (!looking && monitorVisible);
   const desktopInteractive = desktopShown && view !== 'MEETING';
@@ -90,7 +98,7 @@ export function App() {
 
   function openMessenger(target) {
     setConversation(typeof target === 'string' ? target : 'ALL');
-    if (outsideRound) {
+    if (canOpenMessengerPopup) {
       setLobbyMessenger(true);
     } else if (seated) {
       enableSound();
@@ -110,8 +118,8 @@ export function App() {
   }
 
   useEffect(() => {
-    if (!outsideRound) setLobbyMessenger(false);
-  }, [outsideRound]);
+    if (!canOpenMessengerPopup) setLobbyMessenger(false);
+  }, [canOpenMessengerPopup]);
 
   useEffect(() => {
     if (!returning) return;
@@ -131,7 +139,7 @@ export function App() {
   useShortcuts(connected && (computer || outsideRound), {
     Tab: computer && (desktopInteractive || looking) ? switchView : undefined,
     KeyQ: seated && officeReady ? lookAround : undefined,
-    KeyM: (seated && desktopInteractive) || outsideRound ? openMessenger : undefined,
+    KeyM: (seated && desktopInteractive) || canOpenMessengerPopup ? openMessenger : undefined,
     KeyN: computer && desktopInteractive ? toggleInbox : undefined,
     Escape: looking ? returnToMonitor : inbox ? () => setInbox(false) : undefined,
   });
@@ -150,6 +158,8 @@ export function App() {
     setLooking(false);
   }
 
+  const gauges = <GameGauges game={game} microphone={microphone} canOpenLoan={canOpenLoan}
+    openLoan={() => setActiveDialog('loan')} />;
   const messenger = room && messengerOpen && <Messenger key={'messenger-' + room.code + '-' + room.round} game={game}
     send={send} initialChannel={conversation} docked={inLobby} playing={!outsideRound} closing={Boolean(returning)} onDismiss={closeMessenger} />;
 
@@ -158,36 +168,41 @@ export function App() {
       looking={looking} focused={!looking} onReady={setOfficeReady} onReturn={returnToMonitor} />}
     {view === 'MEETING' && <Meeting reason={game.meeting} startedAt={game.meetingStarted} />}
     <main inert={!desktopInteractive} data-monitor={desktopShown}
-      className={(officeActive ? 'game-desktop ' : '') + 'min-h-screen'}>
+      className={(officeActive ? 'game-desktop ' : '') + (!room || inLobby ? 'arrival-page ' : '') + 'min-h-screen'}>
       <div className="mx-auto max-w-[1520px] space-y-4 px-4 py-5 sm:px-7">
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-ui-border pb-4">
           <h1 className="text-lg font-extrabold tracking-tight">부장님 몰래</h1>
-          {room && <div className="flex flex-wrap items-center gap-2 text-sm">
-            {market && !result && <span id="clock" className="mr-2 tabular-nums">퇴근까지 <b>{clock(market.remainingSeconds)}</b>
-              {market.remainingSeconds <= 120 && <span className="ml-2 text-rose-700">장 마감 임박</span>}</span>}
-            {outsideRound && <button className="control" disabled={!connected} aria-haspopup={inLobby ? undefined : 'dialog'}
-              aria-keyshortcuts="M" onClick={openMessenger}>메신저 <KeyHint>M</KeyHint></button>}
-            {computer && <>
-              {seated && <>
-                <button className="control" id="look" disabled={!connected || !officeReady} aria-keyshortcuts="Q" onClick={lookAround}>주변 보기 <KeyHint>Q</KeyHint></button>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <button type="button" className="control" aria-label="다크 모드" aria-pressed={theme === 'dark'}
+              onClick={toggleTheme}>
+              <span aria-hidden="true">{theme === 'dark' ? '☀ 라이트 모드' : '☾ 다크 모드'}</span>
+            </button>
+            {room && <>
+              {market && !result && <span id="clock" className="mr-2 tabular-nums">퇴근까지 <b>{clock(market.remainingSeconds)}</b>
+                {market.remainingSeconds <= 120 && <span className="ml-2 text-rose-700 dark:text-rose-300">장 마감 임박</span>}</span>}
+              {canOpenMessengerPopup && <button className="control" disabled={!connected} aria-haspopup="dialog"
+                aria-keyshortcuts="M" onClick={openMessenger}>메신저 <KeyHint>M</KeyHint></button>}
+              {computer && <>
+                {seated && <>
+                  <button className="control" id="look" disabled={!connected || !officeReady} aria-keyshortcuts="Q" onClick={lookAround}>주변 보기 <KeyHint>Q</KeyHint></button>
+                </>}
+                <button className="control" id="switchView" disabled={!connected} aria-keyshortcuts="Tab" onClick={switchView}>
+                  {view === 'WORK' ? '주식으로' : '업무로'} <KeyHint>Tab</KeyHint>
+                </button>
               </>}
-              <button className="control" id="switchView" disabled={!connected} aria-keyshortcuts="Tab" onClick={switchView}>
-                {view === 'WORK' ? '주식으로' : '업무로'} <KeyHint>Tab</KeyHint>
-              </button>
+              <button type="button" className="control" aria-haspopup="dialog" disabled={!connected}
+                onClick={() => setActiveDialog('leave')}>나가기</button>
             </>}
-            {computer && <button type="button" className="control" aria-haspopup="dialog" disabled={!canOpenLoan}
-              onClick={() => setActiveDialog('loan')}>비상 대출</button>}
-            <button type="button" className="control" aria-haspopup="dialog" disabled={!connected}
-              onClick={() => setActiveDialog('leave')}>나가기</button>
-          </div>}
+          </div>
         </header>
         {!room && <Entry connected={connected} send={send} />}
-        {inLobby && <div className={'grid items-start gap-4 ' + (messengerOpen ? 'lg:grid-cols-[minmax(0,1fr)_minmax(20rem,27rem)]' : '')}>
+        {!room && choiceNeeded && <MicrophonePermission onChoose={choose} />}
+        {inLobby && <div className="lobby-grid">
           <Lobby key={'lobby-' + room.code + '-' + room.round} game={game} host={host} send={send} />
           {messenger}
         </div>}
-        {desk && !result && <Work game={game} visible={desktopView === 'WORK'} active={desktopInteractive && view === 'WORK' && !messengerOpen} send={send} />}
-        {market && !result && <Market visible={desktopView === 'MARKET'} active={desktopInteractive && !messengerOpen && view === 'MARKET'} game={game} name={name} send={send} />}
+        {desk && !result && <Work game={game} visible={desktopView === 'WORK'} active={desktopInteractive && view === 'WORK' && !messengerOpen} gauges={gauges} send={send} />}
+        {market && !result && <Market visible={desktopView === 'MARKET'} active={desktopInteractive && !messengerOpen && view === 'MARKET'} game={game} name={name} gauges={gauges} theme={theme} send={send} />}
         {result && <Results result={result} name={name} host={host} connected={connected} send={send} />}
         {!inLobby && messenger}
         {computer && desktopShown && <Notifications game={game} inbox={inbox} toggleInbox={toggleInbox}
@@ -196,7 +211,7 @@ export function App() {
           <LoanDialog game={game} send={send} onDismiss={() => setActiveDialog(null)} />}
         {activeDialog === 'leave' && room && view !== 'MEETING' &&
           <LeaveDialog game={game} host={host} send={send} onDismiss={() => setActiveDialog(null)} />}
-        <p id="status" role="status" className="text-sm text-slate-600">{game.status}</p>
+        <p id="status" role="status" className="text-sm text-ui-secondary">{game.status}</p>
       </div>
     </main>
   </>;
