@@ -1,12 +1,12 @@
 import React, { useEffect, useRef } from 'react';
 import { KeyHint } from '../../shared/ui/shortcuts.jsx';
 
-export function OfficeViewport({ office, market, players, focused, looking, onReady, onReturn }) {
+export function OfficeViewport({ office, market, players, micLevels, focused, looking, onReady, onReturn }) {
   const canvas = useRef(null);
   const scene = useRef(null);
   const pointer = useRef(null);
   const settings = useRef(null);
-  settings.current = { focused, players };
+  settings.current = { focused, players, micLevels };
 
   useEffect(() => {
     let closed = false;
@@ -14,6 +14,7 @@ export function OfficeViewport({ office, market, players, focused, looking, onRe
     import('./office.js').then(renderer => {
       if (closed) return;
       renderer.setOfficePlayers(settings.current.players);
+      renderer.setOfficeMicLevels(settings.current.micLevels);
       renderer.updateOffice(office.current);
       release = renderer.mountOffice(canvas.current);
       scene.current = renderer;
@@ -33,6 +34,10 @@ export function OfficeViewport({ office, market, players, focused, looking, onRe
     scene.current?.setOfficePlayers(players);
     scene.current?.updateOffice(office.current);
   }, [office, market, players]);
+
+  useEffect(() => {
+    scene.current?.setOfficeMicLevels(micLevels);
+  }, [micLevels]);
 
   useEffect(() => {
     scene.current?.setOfficeFocus(focused);

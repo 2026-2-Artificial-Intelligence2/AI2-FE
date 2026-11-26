@@ -164,6 +164,7 @@ export function App() {
 
   return <>
     {officeActive && <OfficeViewport office={office} market={market} players={room.room.players}
+      micLevels={connected ? game.micLevels : undefined}
       looking={looking} focused={!looking} onReady={setOfficeReady} onReturn={returnToMonitor} />}
     {view === 'MEETING' && <Meeting reason={game.meeting} startedAt={game.meetingStarted} />}
     <main inert={!desktopInteractive} data-monitor={desktopShown}
