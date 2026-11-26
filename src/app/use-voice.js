@@ -50,20 +50,38 @@ export function useVoice({ game, send, signals, shareLevel = true }) {
     peers.current.delete(label);
   }, []);
 
+  // 휴대폰 브라우저는 사용자가 누르지 않은 순간의 소리 재생을 막는 경우가 많다(연결은 됐는데 소리만 안 들림).
+  // 막히면 blocked로 표시하고, 다음 터치·클릭 때 다시 재생한다(unlock).
+  const tryPlay = useCallback(peer => {
+    if (!peer?.audio) return;
+    peer.audio.play().then(() => {
+      if (peer.blocked) { peer.blocked = false; refresh(); }
+    }).catch(() => {
+      if (!peer.blocked) { peer.blocked = true; refresh(); }
+    });
+  }, [refresh]);
+
+  const unlock = useCallback(() => {
+    void local.current?.context.resume().catch(() => {});
+    for (const peer of peers.current.values()) tryPlay(peer);
+  }, [tryPlay]);
+
   const attachAudio = useCallback((label, stream) => {
     const peer = peers.current.get(label);
     if (!peer || peer.audio || !local.current) return;
-    const audio = Object.assign(document.createElement('audio'), { autoplay: true, srcObject: stream });
+    const audio = Object.assign(document.createElement('audio'), { autoplay: true, playsInline: true, srcObject: stream });
+    audio.setAttribute('playsinline', '');
     audio.volume = volumes.current.get(label) ?? 1;
     audio.dataset.voicePeer = label;
     document.body.append(audio);
     peer.audio = audio;
+    tryPlay(peer);
     const analyser = local.current.context.createAnalyser();
     analyser.fftSize = 512;
     local.current.context.createMediaStreamSource(stream).connect(analyser);
     peer.analyser = analyser;
     refresh();
-  }, [refresh]);
+  }, [refresh, tryPlay]);
 
   const makePeer = useCallback(label => {
     const pc = new RTCPeerConnection({ iceServers });
@@ -99,6 +117,8 @@ export function useVoice({ game, send, signals, shareLevel = true }) {
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
       const context = new AudioContext();
+      // 참여 버튼을 누른 이 순간에 소리 장치를 깨워 둔다(휴대폰은 나중에 깨우면 막힐 수 있다).
+      void context.resume().catch(() => {});
       const analyser = context.createAnalyser();
       analyser.fftSize = 512;
       context.createMediaStreamSource(media).connect(analyser);
@@ -193,6 +213,17 @@ export function useVoice({ game, send, signals, shareLevel = true }) {
 
   useEffect(() => () => leave(false), [leave]);
 
+  // 재생이 막힌 상대가 있으면, 화면 어디든 처음 누르는 순간 다시 재생한다.
+  const blocked = [...peers.current.values()].some(peer => peer.blocked);
+  useEffect(() => {
+    if (!blocked) return;
+    const events = ['pointerdown', 'keydown', 'touchend'];
+    const handler = () => unlock();
+    // 재생에 성공할 때까지(blocked가 풀릴 때까지) 누를 때마다 다시 시도한다.
+    for (const name of events) document.addEventListener(name, handler, { capture: true });
+    return () => { for (const name of events) document.removeEventListener(name, handler, { capture: true }); };
+  }, [blocked, unlock]);
+
   // 말하는 사람 표시와 내 소리 크기 보내기
   useEffect(() => {
     if (!joined) return;
@@ -227,5 +258,8 @@ export function useVoice({ game, send, signals, shareLevel = true }) {
     };
   });
 
-  return { available: Boolean(room) && !solo, joined, muted, requesting, error, people, join, leave, toggleMute, setVolume };
+  return {
+    available: Boolean(room) && !solo, joined, muted, requesting, error, people, blocked,
+    join, leave, toggleMute, setVolume, unlock,
+  };
 }

@@ -22,12 +22,14 @@ export function VoicePanel({ voice, connected }) {
 
   const others = voice.people.filter(person => !person.me);
   const someoneSpeaking = voice.people.some(person => person.speaking && !person.me);
-  const label = !voice.joined ? '음성' : voice.muted ? '음성 · 음소거' : '음성 · ' + voice.people.length + '명';
+  const label = !voice.joined ? '음성' : voice.blocked ? '음성 · 소리 켜기' : voice.muted ? '음성 · 음소거'
+    : '음성 · ' + voice.people.length + '명';
 
   return <div ref={box} className="relative">
     <button type="button" className="control flex items-center gap-1.5" aria-haspopup="dialog" aria-expanded={open}
-      aria-label={'음성 대화 설정 (' + label + ')'} onClick={() => setOpen(value => !value)}>
+      aria-label={'음성 대화 설정 (' + label + ')'} onClick={() => { voice.unlock(); setOpen(value => !value); }}>
       <span aria-hidden="true" className={'inline-block h-2 w-2 rounded-full ' + (!voice.joined ? 'bg-ui-track'
+        : voice.blocked ? 'bg-amber-500'
         : voice.muted ? 'bg-rose-500' : someoneSpeaking ? 'bg-emerald-500' : 'bg-emerald-300')} />
       {label}
     </button>
@@ -43,6 +45,10 @@ export function VoicePanel({ voice, connected }) {
           {voice.requesting ? '마이크 권한 확인 중…' : '음성 참여'}
         </button>
       </> : <>
+        {voice.blocked && <div role="alert" className="space-y-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-950 dark:bg-amber-950 dark:text-amber-100">
+          <p>브라우저가 상대 목소리 재생을 막았어요. 아래 버튼을 누르면 들려요.</p>
+          <button type="button" className="control w-full" onClick={voice.unlock}>소리 켜기</button>
+        </div>}
         <div className="flex gap-2">
           <button type="button" className="control flex-1" aria-pressed={voice.muted} disabled={!connected}
             onClick={voice.toggleMute}>{voice.muted ? '음소거 해제' : '음소거'}</button>
