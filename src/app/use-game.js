@@ -33,6 +33,8 @@ function commandResponse(command) {
     case 'SWITCH':
     case 'MESSENGER': return ['GENERAL', message => message.type === 'view'];
     case 'NEWS': return ['NEWS', message => message.type === 'newsHistory'];
+    // 음성 연결 정보(VOICE SIGNAL)는 따로 답이 없으므로 기다리지 않는다.
+    case 'VOICE': return target === 'SIGNAL' ? null : ['VOICE', message => message.type === 'state'];
     default: return null;
   }
 }
@@ -116,6 +118,8 @@ export function useGame() {
   const [game, setGame] = useState(initial);
   const socket = useRef(null);
   const office = useRef(null);
+  /** 음성 연결 정보(voiceSignal)를 받을 함수. 화면 상태에 넣지 않고 바로 넘긴다(use-voice.js). */
+  const voiceSignals = useRef(null);
   const pendingCommands = useRef([]);
   const send = useCallback(command => {
     if (socket.current?.readyState !== WebSocket.OPEN) return false;
@@ -169,6 +173,10 @@ export function useGame() {
       connection.onmessage = event => {
         if (stopped) return;
         let message = JSON.parse(event.data);
+        if (message.type === 'voiceSignal') {
+          voiceSignals.current?.(message);
+          return;
+        }
         const receivedAt = performance.now();
         const pending = pendingCommands.current;
         while (pending.length && receivedAt - pending[0].sentAt >= 15000) pending.shift();
@@ -273,5 +281,5 @@ export function useGame() {
     };
   }, [send]);
 
-  return { game, send, office, dismissNews };
+  return { game, send, office, dismissNews, voiceSignals };
 }
