@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { box } from './character.js';
-import { createMeetingPerformance, furnishMeetingRoom } from './meeting-performance.js';
+import { box } from '../../shared/scene/character.js';
+import { createMeetingPerformance, furnishMeetingRoom } from '../meeting/meeting-performance.js';
 
 export function addMeetingWindow(office) {
   const room = new THREE.Group();
@@ -32,8 +32,10 @@ export function addMeetingWindow(office) {
   }));
   glass.rotation.y = Math.PI / 2;
   glass.position.set(wallX + 0.09, 1.32, centreZ);
+  glass.userData.disposeWithOffice = true;
   office.add(glass);
   const sheen = glass.clone();
+  sheen.geometry = glass.geometry.clone();
   sheen.material = glass.material.clone();
   sheen.material.opacity = 0.08;
   sheen.scale.y = 0.08;

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { footsteps, cough } from './spatial-audio.js';
+import { footsteps, cough } from '../shared/audio/spatial-audio.js';
 
 const seatKey = 'officeStockSeat';
 const initial = {
@@ -30,7 +30,7 @@ function reduce(game, message, receivedAt) {
         room: message,
       };
     case 'chart': return { ...game, candles: message.candles, candleSeconds: message.candleSeconds };
-    case 'catalog': return { ...game, stocks: message.stocks, feeBps: message.feeBps };
+    case 'catalog': return { ...game, stocks: message.stocks, feeBps: message.feeBps, margin: message.margin, loan: message.loan };
     case 'market': return {
       ...game, view: message.view, market: message,
       candles: mergeCandles(game.candles, message.candles),
@@ -55,10 +55,11 @@ function reduce(game, message, receivedAt) {
     case 'fill': return { ...game, fill: message };
     case 'myTrades': return { ...game, trades: message.trades };
     case 'orders': return { ...game, orders: message.orders };
-    case 'chatHistory': return { ...game, chats: message.messages };
+    case 'chatHistory': return { ...game, chats: message.messages, chatHistoryEnd: message.messages.at(-1)?.id ?? 0 };
     case 'chat': return { ...game, chats: [...game.chats, message.message].slice(-300) };
     case 'leakSent': return { ...game, leakReceipt: message };
     case 'error': return { ...game, lastError: message, status: message.message };
+    case 'dismissNews': return { ...game, popup: null };
     case 'newsHistory': return { ...game, history: message.items };
     case 'closed':
     case 'resumeFailed': return { ...initial, connected: true, status: message.message };
@@ -75,6 +76,8 @@ export function useGame() {
     socket.current.send(command);
     return true;
   }, []);
+
+  const dismissNews = useCallback(() => setGame(game => reduce(game, { type: 'dismissNews' })), []);
 
   useEffect(() => {
     const url = new URL('/ws/lobby', location.href);
@@ -149,6 +152,7 @@ export function useGame() {
             resuming = false;
             newsNumber = Math.max(newsNumber, message.newsNumber);
             lastCough = Math.max(lastCough, message.coughBeat);
+            connection.send('NEWS HISTORY');
           }
           if (message.coughBeat > lastCough && message.step) {
             lastCough = message.coughBeat;
@@ -156,9 +160,10 @@ export function useGame() {
           }
           if (message.newsNumber > newsNumber) {
             newsNumber = message.newsNumber;
-            popup = { headline: message.headline, body: message.newsBody, kind: message.newsKind };
+            popup = { number: message.newsNumber, headline: message.headline, body: message.newsBody, kind: message.newsKind };
+            connection.send('NEWS HISTORY');
             clearTimeout(popupTimer);
-            popupTimer = setTimeout(() => setGame(game => ({ ...game, popup: null })), popup.body ? 5000 : 4000);
+            popupTimer = setTimeout(() => setGame(game => ({ ...game, popup: null })), popup.body ? 15000 : 12000);
           }
         }
 
@@ -188,5 +193,5 @@ export function useGame() {
     };
   }, []);
 
-  return { game, send, office };
+  return { game, send, office, dismissNews };
 }

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { box, character, characterHead, defaultLook, oval } from './character.js';
+import { box, character, characterHead, defaultLook, oval } from '../../shared/scene/character.js';
 
 const impacts = [0.95, 2.05, 3.20];
 const frame = 0x445469;

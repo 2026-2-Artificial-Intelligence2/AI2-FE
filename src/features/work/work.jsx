@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { clock, number, won } from './format.js';
-import { KeyHint } from './shortcuts.jsx';
+import { clock, number, won } from '../../shared/format.js';
+import { KeyHint } from '../../shared/ui/shortcuts.jsx';
 
 const kinds = {
   sheet: { name: '매출 집계', icon: '▦' },
