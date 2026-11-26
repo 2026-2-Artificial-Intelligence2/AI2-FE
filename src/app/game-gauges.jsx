@@ -4,10 +4,11 @@ function Gauge({ label, value, volume = false, compact = false, meterLabel = lab
   const level = Number.isFinite(value) ? Math.max(0, Math.min(value, 100)) : null;
   const color = level >= 70 ? 'bg-rose-600' : level >= 40 ? 'bg-amber-500' : volume ? 'bg-blue-600 dark:bg-[var(--dark-action)]' : 'bg-indigo-600 dark:bg-[var(--dark-safe)]';
   return <div className={compact
-    ? "grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(1.5rem,1fr)] items-center gap-1.5"
+    ? "grid min-w-0 grid-cols-[minmax(0,2.75rem)_minmax(0,1fr)] items-center gap-1"
     : "min-w-0 space-y-1"}>
-    <div className="flex justify-between gap-2 text-xs leading-tight">
-      <span className="truncate font-medium text-ui-secondary" title={compact ? label : undefined}>{label}</span>
+    <div className={'text-xs leading-tight ' + (compact ? 'min-w-0 text-right' : 'flex justify-between gap-2')}>
+      <span className={'truncate font-medium text-ui-secondary ' + (compact ? 'block' : '')}
+        title={compact ? label : undefined}>{label}</span>
       {!compact && <span className="font-semibold tabular-nums">{level ?? '—'}</span>}
     </div>
     <div className={'overflow-hidden rounded-full bg-ui-track ' + (compact ? 'h-1' : 'h-1.5')}
@@ -22,7 +23,7 @@ export function GameGauges({ game, microphone }) {
   const you = game.room?.youLabel;
   const levels = game.micLevels ?? {};
   const others = (game.room?.members ?? []).filter(member => member.label !== you);
-  return <section className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 rounded-lg border border-ui-border bg-ui-subtle p-3 min-[48rem]:w-auto min-[48rem]:grid-cols-[minmax(7rem,1fr)_minmax(11rem,1.5fr)_auto]"
+  return <section className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 rounded-lg border border-ui-border bg-ui-subtle p-3 min-[48rem]:w-auto min-[48rem]:grid-cols-[minmax(7rem,1fr)_minmax(14rem,1.5fr)_auto]"
     aria-label="업무 및 마이크 게이지">
     <div className="col-span-full min-w-0 min-[48rem]:col-auto">
       <Gauge label="내 업무 게이지" value={game.market?.suspicion} />

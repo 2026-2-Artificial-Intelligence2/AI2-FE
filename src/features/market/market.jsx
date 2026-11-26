@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { number, signed, won, clock } from '../../shared/format.js';
 import { PriceChart } from './price-chart.jsx';
 import { Order } from './order.jsx';
@@ -89,18 +89,38 @@ function Account({ game, name, active, send }) {
 
 export function Market({ visible, active, game, name, send, gauges, theme }) {
   const [selected, setSelected] = useState('');
+  const [sortBy, setSortBy] = useState('rate');
   const frame = useRef(null);
   const [size, setSize] = useWindowSize('market');
   const [mode, setMode] = useState('MARKET');
   const [limit, setLimit] = useState('');
   const { market, candles } = game;
-  const symbols = Object.keys(market.prices).sort((a, b) => name(a).localeCompare(name(b), 'ko-KR'));
-  const symbol = symbols.includes(selected) ? selected : symbols[0];
-  if (!visible || !symbol) return null;
-  const price = market.prices[symbol];
+  const listedStocks = Object.entries(market.prices).map(([id, price]) => {
+    const opening = openingPrice(candles[id]);
+    const change = opening > 0 ? price - opening : null;
+    return { id, label: name(id), price, change, rate: change === null ? null : 100 * change / opening };
+  });
+  listedStocks.sort((a, b) => {
+    if (sortBy === 'rate' && a.rate !== b.rate) {
+      if (a.rate === null) return 1;
+      if (b.rate === null) return -1;
+      return b.rate - a.rate;
+    }
+    return a.label.localeCompare(b.label, 'ko-KR') || a.id.localeCompare(b.id);
+  });
+  const selectedStock = listedStocks.find(({ id }) => id === selected) ?? listedStocks[0];
+  const symbol = selectedStock?.id;
+
+  useEffect(() => {
+    if (!visible || !symbol || selected === symbol) return;
+    setSelected(symbol);
+    setLimit('');
+    setMode('MARKET');
+  }, [visible, symbol, selected]);
+
+  if (!visible || !selectedStock) return null;
+  const { price, change, rate } = selectedStock;
   const series = candles[symbol] ?? [];
-  const opening = openingPrice(series);
-  const change = opening ? price - opening : null;
   const stock = game.stocks.find(stock => stock.id === symbol);
   const news = (game.history ?? []).filter(item => item.symbols?.some(id => id === symbol || id === stock?.underlying));
   function select(id) {
@@ -121,7 +141,7 @@ export function Market({ visible, active, game, name, send, gauges, theme }) {
               <div className="flex flex-wrap items-baseline gap-x-3">
                 <p className="text-4xl font-extrabold tracking-tight tabular-nums">{won(price)}</p>
                 {change !== null && <p className={'text-sm font-semibold tabular-nums ' + movement(change)}>
-                  {change > 0 ? '▲ ' : change < 0 ? '▼ ' : ''}{signed(change, won)} ({percent(100 * change / opening)})
+                  {change > 0 ? '▲ ' : change < 0 ? '▼ ' : ''}{signed(change, won)} ({percent(rate)})
                   <span className="ml-2 font-normal text-ui-caption">출근 시점 대비</span>
                 </p>}
               </div>
@@ -147,20 +167,23 @@ export function Market({ visible, active, game, name, send, gauges, theme }) {
           </details>
         </div>
         <aside className="stock-list panel min-w-0 p-3" aria-label="종목 목록">
-          <h3 className="px-2 pb-2 text-sm font-bold">종목 <span className="font-normal text-ui-caption">이름순</span></h3>
+          <div className="flex flex-wrap items-center justify-between gap-2 px-2 pb-2">
+            <h3 className="text-sm font-bold">종목</h3>
+            <select className="field px-2 py-1 text-xs" aria-label="종목 정렬" value={sortBy}
+              onChange={event => setSortBy(event.target.value)}>
+              <option value="rate">상승률순</option>
+              <option value="name">이름순</option>
+            </select>
+          </div>
           <ul className="max-h-72 overflow-y-auto min-[900px]:max-h-[70vh]">
-            {symbols.map(id => {
-              const previous = openingPrice(candles[id]);
-              const latest = market.prices[id];
-              const rate = previous ? (latest - previous) * 100 / previous : null;
-              return <li key={id}><button type="button" aria-pressed={id === symbol}
+            {listedStocks.map(({ id, label, price: latest, rate }) =>
+              <li key={id}><button type="button" aria-pressed={id === symbol}
                 className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-2 rounded-md px-2 py-2 text-left text-xs hover:bg-ui-muted aria-pressed:bg-blue-50 dark:aria-pressed:bg-[var(--dark-selection)]"
                 onClick={() => select(id)}>
-                <span className="truncate font-semibold">{name(id)}</span>
+                <span className="truncate font-semibold">{label}</span>
                 <span className={'text-right font-semibold tabular-nums ' + movement(rate)}>{rate === null ? '–' : percent(rate)}</span>
                 <span className="text-ui-caption">{id}</span><span className="text-right tabular-nums">{won(latest)}</span>
-              </button></li>;
-            })}
+              </button></li>)}
           </ul>
         </aside>
       </div>

@@ -3,6 +3,7 @@ import {box, character} from '../../shared/scene/character.js';
 import {furnish} from './furnishings.js';
 import {turnListener} from '../../shared/audio/spatial-audio.js';
 import {addMeetingWindow} from './office-meeting-window.js';
+import {makeVoiceTextures, voiceArcCount} from './office-voice.js';
 
 const seats = [[-1,-1],[1,-1],[-1,1],[1,1],[5,-1],[7,-1],[5,1],[7,1]];
 const colors = [0x89a8ce,0xe4a39e,0x8abdad,0xdfb181,0xab9fc1,0xe6b3a2,0x87b4bb,0xb895ba];
@@ -21,8 +22,10 @@ function focusProgress(now) {
 }
 const workers=[];
 let participants=[];
+let micLevels, voiceTextures;
 let width=0, height=0;
 export function setOfficePlayers(players) { participants = players; }
+export function setOfficeMicLevels(levels) { micLevels = levels; }
 
 function init() {
   renderer = new THREE.WebGLRenderer({canvas,antialias:true});
@@ -52,6 +55,7 @@ function init() {
   const { dressDesk } = furniture;
   updateSky = furniture.updateSky;
   meetingWindow=addMeetingWindow(scene);
+  voiceTextures=makeVoiceTextures();
   for (const [i,[x,z]] of seats.entries()) {
     const forward=-Math.sign(z);
     const deskZ=z+0.65*forward;
@@ -66,7 +70,16 @@ function init() {
     const person=character({topColor:colors[i],skin:[0xf0c5a7,0xe4b098,0xca9278][i%3],hairColor:[0x57434b,0x815a4d,0x473847][i%3],hairId:['short','crop','bun'][i%3],accessoryId:i%3?'none':'glasses'});
     person.root.position.set(x,0,z);
     person.root.rotation.y=forward===1?0:Math.PI;
-    workers.push(person);scene.add(person.root);
+    const voice = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: voiceTextures[0], depthWrite: false, toneMapped: false,
+    }));
+    voice.position.set(0, 1.68, 0.035);
+    voice.scale.set(0.49, 0.33, 1);
+    voice.center.set(0.5, 0);
+    voice.visible = false;
+    person.root.add(voice);
+    workers.push({ ...person, voice });
+    scene.add(person.root);
   }
   boss=character({topId:'jacket',topColor:0x34464d,accessoryId:'glasses'},false);
   scene.add(boss.root);
@@ -109,7 +122,11 @@ function draw(now) {
   // Room membership can shrink after the match begins. Use the original seat order.
   const knowSeats = self >= 0 && youLabel && seatLabels[self] === youLabel;
   workers.forEach((person,i)=>{
-    person.root.visible=i!==self && !(knowSeats && meetingStarts.has(seatLabels[i]));
+    const label = knowSeats ? seatLabels[i] : undefined;
+    person.root.visible = i !== self && !meetingStarts.has(label);
+    const count = zoom < 1 && person.root.visible && label ? voiceArcCount(micLevels?.[label] ?? 0) : 0;
+    person.voice.visible = count > 0;
+    if (count) person.voice.material.map = voiceTextures[count - 1];
     person.pose(now/1000+i*1.23+(i<participants.length?0:2),false);
   });
   const t=walking?Math.min(1,(now-beatStarted)/2000):1;
@@ -142,6 +159,8 @@ export function mountOffice(element) {
         object.material.dispose();
       }
     });
+    workers.forEach(({ voice }) => voice.material.dispose());
+    voiceTextures.forEach(texture => texture.dispose());
     renderer.dispose();
     renderer.forceContextLoss();
     renderer = latest = null;
