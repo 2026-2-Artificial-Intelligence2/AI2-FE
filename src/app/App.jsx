@@ -3,6 +3,8 @@ import { useGame } from './use-game.js';
 import { useTheme } from './use-theme.js';
 import { MicrophonePermission, useMicrophonePreference } from './microphone-permission.jsx';
 import { useMicrophone } from './use-microphone.js';
+import { useVoice } from './use-voice.js';
+import { VoicePanel } from './voice-panel.jsx';
 import { GameGauges } from './game-gauges.jsx';
 import { enableSound } from '../shared/audio/spatial-audio.js';
 import { clock } from '../shared/format.js';
@@ -19,7 +21,7 @@ import { OfficeViewport } from '../features/office/office-viewport.jsx';
 import { KeyHint, useShortcuts } from '../shared/ui/shortcuts.jsx';
 
 export function App() {
-  const { game, send, office, dismissNews } = useGame();
+  const { game, send, office, dismissNews, voiceSignals } = useGame();
   const { theme, toggleTheme } = useTheme();
   const { choiceNeeded, choose } = useMicrophonePreference();
   const [inbox, setInbox] = useState(false);
@@ -35,6 +37,11 @@ export function App() {
   const [lastNews, setLastNews] = useState(0);
   const { connected, room, view, market, desk, result, actionErrors } = game;
   const microphone = useMicrophone({ connected, roomCode: room?.code, send });
+  const voice = useVoice({ game, send, signals: voiceSignals, shareLevel: microphone.status !== 'on' });
+  // 개발 서버에서만: 마이크 대신 합성음 등으로 음성 대화를 시험할 때 콘솔에서 쓴다(window.officeVoice.join(stream)).
+  useEffect(() => {
+    if (import.meta.env.DEV) window.officeVoice = voice;
+  });
   const seated = view === 'WORK' || view === 'MARKET';
   const messaging = view === 'MESSENGER';
   const computer = seated || messaging;
@@ -178,6 +185,7 @@ export function App() {
               <span aria-hidden="true">{theme === 'dark' ? '☀ 라이트 모드' : '☾ 다크 모드'}</span>
             </button>
             {room && <>
+              <VoicePanel voice={voice} connected={connected} />
               {(market && !result || showLoan) && <div className="flex flex-wrap items-center gap-2">
                 {market && !result && <span id="clock" className="tabular-nums">퇴근까지 <b>{clock(market.remainingSeconds)}</b>
                   {market.remainingSeconds <= 120 && <span className="ml-2 text-rose-700 dark:text-rose-300">장 마감 임박</span>}</span>}

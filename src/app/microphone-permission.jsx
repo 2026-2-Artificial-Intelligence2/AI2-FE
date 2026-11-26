@@ -51,8 +51,9 @@ export function MicrophonePermission({ onChoose }) {
 
   return <Dialog id="microphone-permission" title="마이크를 사용할까요?" pending={pending} onDismiss={skip}>
     <div className="space-y-4 p-5">
-      <p className="text-sm leading-relaxed text-ui-secondary">게임에서 마이크를 켜면 같은 방에 소리 크기만 표시돼요.
-        실제 마이크 사용은 입장 후 <b className="text-ui-text">마이크 켜기</b>를 눌렀을 때 시작해요.</p>
+      <p className="text-sm leading-relaxed text-ui-secondary">방에 들어간 뒤 <b className="text-ui-text">음성 참여</b>를 누르면
+        같은 방 사람들과 목소리로 이야기할 수 있고, 소리 크기도 함께 보여요. 목소리는 서버를 거치지 않고 참여한 사람끼리만 오가요.
+        실제 마이크 사용은 그 버튼을 눌렀을 때 시작해요.</p>
       {message && <p className="text-sm text-rose-700 dark:text-rose-300" role="alert">{message}</p>}
       <div className="flex flex-wrap justify-end gap-2">
         <button type="button" className="control" onClick={skip} disabled={pending}>마이크 없이 계속</button>
