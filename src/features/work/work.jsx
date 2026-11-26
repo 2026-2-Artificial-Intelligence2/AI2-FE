@@ -123,7 +123,7 @@ function WorkForm({ task, connected, lunch, active, workError, send }) {
     {!supported && <p className="text-sm text-ui-secondary">이 업무 유형을 표시할 수 없습니다.</p>}
     <div className="flex flex-wrap items-center justify-between gap-2 border-t border-ui-border pt-4">
       <p className="min-h-5 text-sm text-rose-700 dark:text-rose-300" role="status">{error}</p>
-      <button type="submit" className="ml-auto rounded-lg bg-indigo-700 dark:bg-[#3d3b50] dark:hover:bg-[#4a4860] px-4 py-2 text-sm font-bold text-white hover:bg-indigo-800"
+      <button type="submit" className="primary-action ml-auto rounded-lg px-4 py-2 text-sm font-bold"
         disabled={disabled || !valid || !supported}>
         {pending ? '확인 중…' : kind === 'mail' ? '폴더로 이동' : '업무 제출'}
         {kind === 'sheet' && !pending && <KeyHint>Enter</KeyHint>}

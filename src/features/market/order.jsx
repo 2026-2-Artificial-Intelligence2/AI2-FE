@@ -67,6 +67,7 @@ export function Order({ game, symbol, mode, setMode, limit, setLimit, name, acti
   const value = useAll ? allValue : positive(cashOrder ? amount : quantity);
   const quote = estimate({ pool: market.pools[symbol], buy, mode, value, limit: positive(limit),
     feeBps, cash, available, leverage: multiple, position });
+  const error = quote.error ?? game.actionErrors['ORDER:' + symbol]?.message;
   const submitDisabled = !active || !connected || !desk || !quote.quantity || Boolean(quote.error);
 
   function selectSide(next) {
@@ -157,8 +158,8 @@ export function Order({ game, symbol, mode, setMode, limit, setLimit, name, acti
           {fill.debtRepaidWon > 0 && ' · 빚 상환 ' + won(fill.debtRepaidWon)}
         </p>}
       </div>
-      <p className={`my-2 min-h-8 shrink-0 text-xs ${quote.error ? 'text-rose-700 dark:text-rose-300' : 'text-ui-secondary'}`}>
-        {quote.error ?? '거래 비용 포함 · 체결 금액은 시세에 따라 달라질 수 있습니다.'}
+      <p role="status" className={`my-2 min-h-8 shrink-0 text-xs ${error ? 'text-rose-700 dark:text-rose-300' : 'text-ui-secondary'}`}>
+        {error ?? '거래 비용 포함 · 체결 금액은 시세에 따라 달라질 수 있습니다.'}
       </p>
       <button className={`w-full shrink-0 rounded-lg px-3 py-2.5 font-bold text-white ${buy
         ? 'bg-rose-700 dark:bg-ui-desktop dark:text-[var(--dark-up)] dark:ring-1 dark:ring-inset dark:ring-ui-input dark:hover:ring-[var(--dark-up)]'

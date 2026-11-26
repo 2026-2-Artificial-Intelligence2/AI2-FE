@@ -5,7 +5,8 @@ import { Dialog } from '../../shared/ui/dialog.jsx';
 export function LoanDialog({ game, send, onDismiss }) {
   const [draft, setDraft] = useState('');
   const [request, setRequest] = useState(null);
-  const { connected, loan, desk, lastError } = game;
+  const { connected, loan, desk, actionErrors } = game;
+  const lastError = actionErrors.LOAN;
   const balance = desk.balance;
   const repayment = balance.loanRepayWon ?? 0;
   const amount = /^\d+$/.test(draft) ? BigInt(draft) : 0n;

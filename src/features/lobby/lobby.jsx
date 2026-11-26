@@ -5,7 +5,7 @@ import officeLanding from './office-landing.webp';
 
 const seats = 4;
 
-export function Entry({ connected, send }) {
+export function Entry({ connected, send, status, createError, joinError }) {
   return (
     <section aria-labelledby='entry-title' className='panel entry-card'>
       <img
@@ -20,17 +20,19 @@ export function Entry({ connected, send }) {
           사무실 입장
         </h2>
         <p className='mt-2 text-sm leading-relaxed text-ui-secondary'>같은 방의 직원들과 퇴근까지 순자산을 겨뤄요.</p>
+        <p id='status' role='status' className='mt-3 text-sm text-ui-secondary'>{status}</p>
         <button
           id='create'
           type='button'
           disabled={!connected}
-          className='arrival-action mt-5 w-full rounded-lg px-4 py-2.5 text-sm font-bold'
+          className='primary-action mt-5 w-full rounded-lg px-4 py-2.5 text-sm font-bold'
           onClick={() => {
             enableSound();
             send('CREATE');
           }}>
           방 만들기
         </button>
+        {createError && <p role='alert' className='mt-2 text-xs text-rose-700 dark:text-rose-300'>{createError}</p>}
         <form
           className='mt-5 flex flex-col gap-2 border-t border-ui-border pt-5'
           onSubmit={(event) => {
@@ -53,11 +55,14 @@ export function Entry({ connected, send }) {
               required
               disabled={!connected}
               placeholder='6자리 숫자'
+              aria-invalid={joinError ? true : undefined}
+              aria-describedby={joinError ? 'join-error' : undefined}
             />
             <button id='join' className='control self-stretch px-4' disabled={!connected}>
               입장
             </button>
           </div>
+          {joinError && <p id='join-error' role='alert' className='text-xs text-rose-700 dark:text-rose-300'>{joinError}</p>}
         </form>
       </div>
     </section>
@@ -104,8 +109,8 @@ function InviteCode({ code }) {
 
 function Players({ members, you }) {
   return (
-    <section className='panel p-5' aria-labelledby='players-title'>
-      <header className='mb-4 flex items-center justify-between gap-2'>
+    <section className='panel lobby-players flex min-w-0 flex-col p-5' aria-labelledby='players-title'>
+      <header className='mb-4 flex shrink-0 items-center justify-between gap-2'>
         <h3 id='players-title' className='font-bold'>
           참가자 자리
         </h3>
@@ -113,7 +118,7 @@ function Players({ members, you }) {
           {members.length} / {seats}명
         </p>
       </header>
-      <ul className='grid gap-2 sm:grid-cols-2'>
+      <ul className='grid min-h-0 content-start gap-2 overflow-y-auto sm:grid-cols-2'>
         {Array.from({ length: seats }, (_, index) => {
           const member = members[index];
           const mine = member?.label === you;
@@ -121,7 +126,7 @@ function Players({ members, you }) {
             <li
               key={member?.label ?? 'empty-' + index}
               className={
-                'flex min-h-22 items-center gap-3 rounded-lg border p-3 ' +
+                'flex min-h-22 items-center gap-3 rounded-lg border p-3 min-[45rem]:min-h-21 ' +
                 (mine ? 'border-indigo-200 dark:border-indigo-800 bg-indigo-50/60 dark:bg-[var(--dark-selection)]' : member ? 'border-ui-border bg-ui-surface' : 'border-dashed border-ui-input bg-ui-subtle')
               }>
               <span
@@ -157,16 +162,16 @@ function durationText(seconds) {
   return [minutes ? minutes + '분' : '', rest ? rest + '초' : ''].filter(Boolean).join(' ');
 }
 
-function RoomSettings({ sessionSeconds, host, connected, lastError, canStart, send }) {
+function RoomSettings({ sessionSeconds, host, connected, lengthError, startError, canStart, send }) {
   const [minutes, setMinutes] = useState(String(Math.ceil(sessionSeconds / 60)));
   const [request, setRequest] = useState(null);
   const valid = /^\d+$/.test(minutes) && Number(minutes) >= 1 && Number(minutes) <= 60;
   const requestedSeconds = Number(minutes) * 60;
-  const pending = connected && request && request.seconds !== sessionSeconds && request.error === lastError;
+  const pending = connected && request && request.seconds !== sessionSeconds && !lengthError;
   const changed = requestedSeconds !== sessionSeconds;
 
   return (
-    <section className='panel space-y-4 p-5' aria-labelledby='settings-title'>
+    <section className={'panel space-y-4 p-5' + (host ? '' : ' self-start')} aria-labelledby='settings-title'>
       <h3 id='settings-title' className='font-bold'>
         방 설정
       </h3>
@@ -183,7 +188,7 @@ function RoomSettings({ sessionSeconds, host, connected, lastError, canStart, se
             onSubmit={(event) => {
               event.preventDefault();
               if (!connected || !valid || !changed || pending) return;
-              if (send('LENGTH ' + Number(minutes))) setRequest({ seconds: requestedSeconds, error: lastError });
+              if (send('LENGTH ' + Number(minutes))) setRequest({ seconds: requestedSeconds });
             }}>
             <label className='block text-sm font-semibold' htmlFor='room-minutes'>
               근무 시간 변경 (1~60분)
@@ -205,18 +210,20 @@ function RoomSettings({ sessionSeconds, host, connected, lastError, canStart, se
                 {pending ? '적용 중…' : '적용'}
               </button>
             </div>
+            {lengthError && <p role='alert' className='text-xs text-rose-700 dark:text-rose-300'>{lengthError}</p>}
           </form>
           <div className='space-y-2 border-t border-ui-border pt-4'>
             <button
               id='start'
               disabled={!connected || !canStart || Boolean(pending)}
-              className='w-full rounded-lg bg-indigo-700 dark:bg-[#3d3b50] dark:hover:bg-[#4a4860] px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-800'
+              className='primary-action w-full rounded-lg px-4 py-2.5 text-sm font-bold'
               onClick={() => {
                 enableSound();
                 send('START');
               }}>
               게임 시작
             </button>
+            {startError && <p role='alert' className='text-xs text-rose-700 dark:text-rose-300'>{startError}</p>}
             {!canStart && <p className='text-xs text-ui-secondary'>두 명 이상 모이면 시작할 수 있어요.</p>}
           </div>
         </>
@@ -227,31 +234,37 @@ function RoomSettings({ sessionSeconds, host, connected, lastError, canStart, se
   );
 }
 
-export function Lobby({ game, host, send }) {
-  const { room, connected, lastError } = game;
+export function Lobby({ game, host, send, messenger }) {
+  const { room, connected, status, actionErrors } = game;
   return (
-    <section id='lobby' className='min-w-0 space-y-3' aria-labelledby='lobby-title'>
-      <header className='panel arrival-banner flex flex-wrap items-center justify-between gap-5 p-5 sm:px-7'>
-        <div>
-          <h2 id='lobby-title' className='text-xl font-extrabold'>
-            대기실
-          </h2>
-          {room.round > 1 && <p className='mt-1 text-sm text-ui-secondary'>{room.round}번째 판</p>}
+    <section id='lobby' className='lobby-shell min-w-0' aria-labelledby='lobby-title'>
+      <div className='min-w-0 space-y-3'>
+        <header className='panel bg-ui-muted flex flex-wrap items-center justify-between gap-5 p-5 sm:px-7'>
+          <div>
+            <h2 id='lobby-title' className='text-xl font-extrabold'>
+              대기실
+            </h2>
+            <p id='status' role='status' className='mt-1 text-sm text-ui-secondary'>
+              {status || actionErrors.GENERAL?.message || (room.round > 1 ? room.round + '번째 판 · 시작 대기 중' : '시작 대기 중')}
+            </p>
+          </div>
+          <InviteCode code={room.code} />
+        </header>
+        <div className={'lobby-grid' + (host ? '' : ' lobby-grid--guest')}>
+          <Players members={room.members ?? []} you={room.youLabel} />
+          <RoomSettings
+            key={room.sessionSeconds + '-' + connected}
+            sessionSeconds={room.sessionSeconds}
+            host={host}
+            connected={connected}
+            lengthError={actionErrors.LENGTH?.message}
+            startError={actionErrors.START?.message}
+            canStart={room.room.players.length >= 2}
+            send={send}
+          />
         </div>
-        <InviteCode code={room.code} />
-      </header>
-      <div className='grid items-start gap-3 xl:grid-cols-[minmax(0,1fr)_19rem]'>
-        <Players members={room.members ?? []} you={room.youLabel} />
-        <RoomSettings
-          key={room.sessionSeconds + '-' + connected}
-          sessionSeconds={room.sessionSeconds}
-          host={host}
-          connected={connected}
-          lastError={lastError}
-          canStart={room.room.players.length >= 2}
-          send={send}
-        />
       </div>
+      {messenger}
     </section>
   );
 }
