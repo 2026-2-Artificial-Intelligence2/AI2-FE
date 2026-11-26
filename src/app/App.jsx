@@ -37,7 +37,12 @@ export function App() {
   const [lastNews, setLastNews] = useState(0);
   const { connected, room, view, market, desk, result, actionErrors } = game;
   const microphone = useMicrophone({ connected, roomCode: room?.code, send });
-  const voice = useVoice({ game, send, signals: voiceSignals, shareLevel: microphone.status !== 'on' });
+  const voice = useVoice({ game, send, signals: voiceSignals });
+  // 휴대폰 브라우저는 마이크를 한 번에 하나만 쓸 수 있다. 소리 크기용 마이크를 또 잡으면 음성 대화 마이크가 무음이 되므로,
+  // 음성에 참여하면 소리 크기용 마이크는 끄고 음성 마이크로 소리 크기를 함께 보낸다.
+  useEffect(() => {
+    if (voice.joined && microphone.status !== 'off') microphone.stop(false);
+  }, [voice.joined, microphone]);
   // 개발 서버에서만: 마이크 대신 합성음 등으로 음성 대화를 시험할 때 콘솔에서 쓴다(window.officeVoice.join(stream)).
   useEffect(() => {
     if (import.meta.env.DEV) window.officeVoice = voice;
@@ -165,7 +170,7 @@ export function App() {
     setLooking(false);
   }
 
-  const gauges = <GameGauges game={game} microphone={microphone} />;
+  const gauges = <GameGauges game={game} microphone={microphone} voiceJoined={voice.joined} />;
   const messenger = room && messengerOpen && <Messenger key={'messenger-' + room.code + '-' + room.round} game={game}
     send={send} initialChannel={conversation} docked={inLobby} playing={!outsideRound} closing={Boolean(returning)} onDismiss={closeMessenger} />;
 

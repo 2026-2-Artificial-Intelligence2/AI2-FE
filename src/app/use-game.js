@@ -100,6 +100,7 @@ function reduce(game, message, receivedAt) {
       else delete micLevels[message.player];
       return { ...game, micLevels };
     }
+    case 'voiceConfig': return { ...game, voiceIceServers: message.iceServers };
     case 'workError': return { ...game, workError: message };
     case 'error': return {
       ...game, lastError: message, actionErrors: { ...game.actionErrors, [message.scope]: message },

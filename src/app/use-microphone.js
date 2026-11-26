@@ -72,5 +72,5 @@ export function useMicrophone({ connected, roomCode, send }) {
     }
   }
 
-  return { status, error, toggle };
+  return { status, error, toggle, stop };
 }
