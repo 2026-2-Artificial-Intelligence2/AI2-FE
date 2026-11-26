@@ -35,6 +35,8 @@ export function useVoice({ game, send, signals, shareLevel = true }) {
   const [joined, setJoined] = useState(false);
   const [muted, setMuted] = useState(false);
   const [requesting, setRequesting] = useState(false);
+  /** 음성 마이크가 소리 없이 멈췄는가(다른 앱·탭이 마이크를 가져가는 등). */
+  const [micStalled, setMicStalled] = useState(false);
   const [error, setError] = useState('');
   const [speaking, setSpeaking] = useState({});
   const [, redraw] = useState(0);
@@ -104,6 +106,7 @@ export function useVoice({ game, send, signals, shareLevel = true }) {
     }
     setJoined(false);
     setMuted(false);
+    setMicStalled(false);
     setSpeaking({});
   }, [closePeer, send]);
 
@@ -123,7 +126,7 @@ export function useVoice({ game, send, signals, shareLevel = true }) {
       analyser.fftSize = 512;
       context.createMediaStreamSource(media).connect(analyser);
       local.current = { stream: media, context, analyser };
-      for (const track of media.getAudioTracks()) track.addEventListener('ended', () => leave(), { once: true });
+      watchTrack(media);
       setJoined(true);
       setMuted(false);
       send('VOICE JOIN');
@@ -131,6 +134,41 @@ export function useVoice({ game, send, signals, shareLevel = true }) {
       setError(failure.name === 'NotAllowedError' ? '브라우저에서 마이크 권한을 허용해 주세요.' : failure.message);
     } finally {
       setRequesting(false);
+    }
+  }
+
+  /** 마이크 트랙이 멈추거나 다시 살아나는 것을 지켜본다. 끝나 버리면(ended) 다시 잡기를 권한다. */
+  function watchTrack(media) {
+    for (const track of media.getAudioTracks()) {
+      track.addEventListener('mute', () => setMicStalled(true));
+      track.addEventListener('unmute', () => setMicStalled(false));
+      track.addEventListener('ended', () => setMicStalled(true), { once: true });
+    }
+  }
+
+  /** 마이크를 새로 잡아 모든 연결의 보내는 소리를 바꾼다(연결은 그대로). */
+  async function restartMic() {
+    if (!local.current) return;
+    try {
+      const media = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      const track = media.getAudioTracks()[0];
+      track.enabled = !muted;
+      for (const peer of peers.current.values()) {
+        const sender = peer.pc.getSenders().find(s => s.track?.kind === 'audio' || s.track === null);
+        if (sender) await sender.replaceTrack(track);
+      }
+      local.current.stream.getTracks().forEach(old => old.stop());
+      const analyser = local.current.context.createAnalyser();
+      analyser.fftSize = 512;
+      local.current.context.createMediaStreamSource(media).connect(analyser);
+      local.current = { ...local.current, stream: media, analyser };
+      watchTrack(media);
+      setMicStalled(false);
+      setError('');
+    } catch (failure) {
+      setError(failure.name === 'NotAllowedError' ? '브라우저에서 마이크 권한을 허용해 주세요.' : failure.message);
     }
   }
 
@@ -259,7 +297,7 @@ export function useVoice({ game, send, signals, shareLevel = true }) {
   });
 
   return {
-    available: Boolean(room) && !solo, joined, muted, requesting, error, people, blocked,
-    join, leave, toggleMute, setVolume, unlock,
+    available: Boolean(room) && !solo, joined, muted, requesting, error, people, blocked, micStalled,
+    join, leave, toggleMute, setVolume, unlock, restartMic,
   };
 }

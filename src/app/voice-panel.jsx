@@ -22,14 +22,15 @@ export function VoicePanel({ voice, connected }) {
 
   const others = voice.people.filter(person => !person.me);
   const someoneSpeaking = voice.people.some(person => person.speaking && !person.me);
-  const label = !voice.joined ? '음성' : voice.blocked ? '음성 · 소리 켜기' : voice.muted ? '음성 · 음소거'
+  const label = !voice.joined ? '음성' : voice.micStalled ? '음성 · 마이크 멈춤' : voice.blocked ? '음성 · 소리 켜기'
+    : voice.muted ? '음성 · 음소거'
     : '음성 · ' + voice.people.length + '명';
 
   return <div ref={box} className="relative">
     <button type="button" className="control flex items-center gap-1.5" aria-haspopup="dialog" aria-expanded={open}
       aria-label={'음성 대화 설정 (' + label + ')'} onClick={() => { voice.unlock(); setOpen(value => !value); }}>
       <span aria-hidden="true" className={'inline-block h-2 w-2 rounded-full ' + (!voice.joined ? 'bg-ui-track'
-        : voice.blocked ? 'bg-amber-500'
+        : voice.micStalled || voice.blocked ? 'bg-amber-500'
         : voice.muted ? 'bg-rose-500' : someoneSpeaking ? 'bg-emerald-500' : 'bg-emerald-300')} />
       {label}
     </button>
@@ -45,6 +46,10 @@ export function VoicePanel({ voice, connected }) {
           {voice.requesting ? '마이크 권한 확인 중…' : '음성 참여'}
         </button>
       </> : <>
+        {voice.micStalled && <div role="alert" className="space-y-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-950 dark:bg-amber-950 dark:text-amber-100">
+          <p>내 마이크 소리가 상대에게 가지 않고 있어요. 다른 앱이나 탭이 마이크를 쓰고 있을 수 있어요.</p>
+          <button type="button" className="control w-full" onClick={voice.restartMic}>마이크 다시 잡기</button>
+        </div>}
         {voice.blocked && <div role="alert" className="space-y-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-950 dark:bg-amber-950 dark:text-amber-100">
           <p>브라우저가 상대 목소리 재생을 막았어요. 아래 버튼을 누르면 들려요.</p>
           <button type="button" className="control w-full" onClick={voice.unlock}>소리 켜기</button>

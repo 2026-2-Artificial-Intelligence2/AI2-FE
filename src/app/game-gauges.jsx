@@ -19,7 +19,7 @@ function Gauge({ label, value, volume = false, compact = false, meterLabel = lab
   </div>;
 }
 
-export function GameGauges({ game, microphone }) {
+export function GameGauges({ game, microphone, voiceJoined = false }) {
   const you = game.room?.youLabel;
   const levels = game.micLevels ?? {};
   const others = (game.room?.members ?? []).filter(member => member.label !== you);
@@ -34,10 +34,12 @@ export function GameGauges({ game, microphone }) {
       {others.map(member => <Gauge key={member.label} label={member.label} meterLabel={member.label + ' 마이크 볼륨'}
         value={member.online ? levels[member.label] : undefined} volume compact />)}
     </div>
-    <button type="button" className="control self-center px-2 py-1 text-xs whitespace-nowrap"
-      aria-pressed={microphone.status === 'on'} disabled={!game.connected} onClick={microphone.toggle}>
-      {microphone.status === 'on' ? '내 마이크 끄기' : microphone.status === 'requesting' ? '권한 요청 취소' : '내 마이크 켜기'}
-    </button>
+    {voiceJoined
+      ? <span className="self-center text-xs whitespace-nowrap text-ui-secondary" title="음성 대화 마이크로 소리 크기를 보내고 있어요.">음성 마이크 사용 중</span>
+      : <button type="button" className="control self-center px-2 py-1 text-xs whitespace-nowrap"
+        aria-pressed={microphone.status === 'on'} disabled={!game.connected} onClick={microphone.toggle}>
+        {microphone.status === 'on' ? '내 마이크 끄기' : microphone.status === 'requesting' ? '권한 요청 취소' : '내 마이크 켜기'}
+      </button>}
     {microphone.error && <p role="status" className="col-span-full text-xs text-rose-700 dark:text-rose-300">{microphone.error}</p>}
   </section>;
 }
