@@ -1,13 +1,23 @@
 import * as THREE from 'three';
-import {box, character} from './character.js';
+import {box, character} from '../../shared/scene/character.js';
 import {furnish} from './furnishings.js';
-import {turnListener} from './spatial-audio.js';
+import {turnListener} from '../../shared/audio/spatial-audio.js';
 import {addMeetingWindow} from './office-meeting-window.js';
 
 const seats = [[-1,-1],[1,-1],[-1,1],[1,1],[5,-1],[7,-1],[5,1],[7,1]];
 const colors = [0x89a8ce,0xe4a39e,0x8abdad,0xdfb181,0xab9fc1,0xe6b3a2,0x87b4bb,0xb895ba];
-let scene, camera, renderer, boss, latest, canvas, dialog, meetingWindow;
-let yaw=0, pitch=0, previousX, previousY, self=-1;
+let scene, camera, renderer, boss, latest, canvas, meetingWindow;
+let yaw=0, pitch=0, self=-1;
+let focus = false;
+let monitorFrameDrawn = false;
+let transition = { from: 0, to: 0, started: 0 };
+const focusDuration = 820;
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function focusProgress(now) {
+  const progress = reduceMotion ? 1 : THREE.MathUtils.clamp((now - transition.started) / focusDuration, 0, 1);
+  return THREE.MathUtils.lerp(transition.from, transition.to, progress * progress * (3 - 2 * progress));
+}
 const workers=[];
 let participants=[];
 let width=0, height=0;
@@ -72,13 +82,21 @@ function draw(now) {
   const {position,forwardZ}=step.listener;
   self=seats.findIndex(([x,z])=>position.x===x && position.z===z);
   const w=canvas.clientWidth,h=canvas.clientHeight;
+  const zoom = focusProgress(now);
+  if (zoom === 1 && monitorFrameDrawn && w === width && h === height) return;
+  monitorFrameDrawn = zoom === 1;
   if (w && h && (w!==width || h!==height)) {
     width=w; height=h;
     renderer.setSize(w,h,false);
     camera.aspect=w/h;camera.updateProjectionMatrix();
   }
-  camera.position.set(position.x,1.4,position.z);
-  camera.rotation.set(pitch,(forwardZ===1?Math.PI:0)+yaw,0,'YXZ');
+  camera.position.set(position.x, 1.4 - 0.24 * zoom, position.z + forwardZ * 0.45 * zoom);
+  camera.rotation.set(pitch * (1 - zoom) - 0.27 * zoom, (forwardZ === 1 ? Math.PI : 0) + yaw * (1 - zoom), 0, 'YXZ');
+  const fov = 68 - zoom * 40;
+  if (fov !== camera.fov) {
+    camera.fov = fov;
+    camera.updateProjectionMatrix();
+  }
   // Room membership can shrink after the match begins. Use the original seat order.
   const knowSeats = self >= 0 && youLabel && seatLabels[self] === youLabel;
   workers.forEach((person,i)=>{
@@ -95,30 +113,49 @@ function draw(now) {
   renderer.render(scene,camera);
 }
 
-export function openOffice() {
-  if (!dialog) setupControls();
-  if (!renderer) init();
-  yaw=0; pitch=0;
-  dialog.showModal();
+export function mountOffice(element) {
+  canvas = element;
+  width = height = 0;
+  yaw = pitch = 0;
+  focus = false;
+  monitorFrameDrawn = false;
+  transition = { from: 0, to: 0, started: performance.now() };
+  init();
   renderer.setAnimationLoop(draw);
+  return () => {
+    renderer.setAnimationLoop(null);
+    scene.traverse(object => {
+      if (object.isDirectionalLight) object.shadow.dispose();
+      if (object.userData.disposeWithOffice) {
+        object.geometry.dispose();
+        object.material.map?.dispose();
+        object.material.dispose();
+      }
+    });
+    renderer.dispose();
+    renderer.forceContextLoss();
+    renderer = latest = null;
+    workers.length = 0;
+    turnListener(0);
+  };
 }
 
-function setupControls() {
-  canvas=document.querySelector('#officeCanvas');
-  dialog=document.querySelector('#office');
-  document.querySelector('#back').onclick=()=>dialog.close();
-  dialog.addEventListener('close',()=>{renderer?.setAnimationLoop(null);turnListener(0);previousX=undefined;});
-  canvas.onpointerdown=e=>{canvas.setPointerCapture(e.pointerId);previousX=e.clientX;previousY=e.clientY;};
-  canvas.onpointermove=e=>{
-    if(previousX===undefined)return;
-    yaw=THREE.MathUtils.clamp(yaw-(e.clientX-previousX)*0.007,-2.35,2.35);
-    pitch=THREE.MathUtils.clamp(pitch-(e.clientY-previousY)*0.006,-0.7,0.65);
-    previousX=e.clientX;previousY=e.clientY;turnListener(yaw);
-  };
-  canvas.onlostpointercapture=()=>{previousX=undefined;};
+export function setOfficeFocus(next) {
+  if (next === focus) return;
+  const now = performance.now();
+  const from = focusProgress(now);
+  if (!next && from > 0.95) {
+    yaw = 0.27;
+    pitch = 0.07;
+  }
+  focus = next;
+  transition = { from, to: next ? 1 : 0, started: now };
+  turnListener(next ? 0 : yaw);
 }
-export function closeOffice() {
-  renderer?.setAnimationLoop(null);
-  if (dialog?.open) dialog.close();
-  latest=null;
+
+export function turnOffice(dx, dy) {
+  if (focus) return;
+  yaw = THREE.MathUtils.clamp(yaw - dx * 0.007, -2.35, 2.35);
+  pitch = THREE.MathUtils.clamp(pitch - dy * 0.006, -0.7, 0.65);
+  turnListener(yaw);
 }

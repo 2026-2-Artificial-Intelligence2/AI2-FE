@@ -1,0 +1,9 @@
+@layer components {
+  .resize-grip {
+    @apply absolute z-10 grid size-6 touch-none select-none place-items-center rounded-sm text-lg leading-none text-slate-600 hover:bg-slate-200;
+    cursor: nwse-resize;
+  }
+  .resize-grip-top { inset: 0 auto auto 0; }
+  .resize-grip-bottom { inset: auto 0 0 auto; }
+  .resize-grip-top span { transform: rotate(180deg); }
+}

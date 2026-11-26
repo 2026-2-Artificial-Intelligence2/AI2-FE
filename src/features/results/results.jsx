@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { clock, number, won } from './format.js';
+import { clock, number, won } from '../../shared/format.js';
 
 const playerLabel = (player, you) => player === you ? player + ' (나)' : player;
 

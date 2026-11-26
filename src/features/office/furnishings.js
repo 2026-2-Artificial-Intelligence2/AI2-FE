@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {box, oval} from './character.js';
+import {box, oval} from '../../shared/scene/character.js';
 
 function painted(width,height,paint) {
   const canvas=document.createElement('canvas');
@@ -15,6 +15,7 @@ function panel(parent,x,y,z,w,h,material,face=1) {
   const mesh=new THREE.Mesh(new THREE.PlaneGeometry(w,h),material);
   mesh.position.set(x,y,z);
   mesh.rotation.y=face===1?0:Math.PI;
+  mesh.userData.disposeWithOffice = true;
   parent.add(mesh);
   return mesh;
 }

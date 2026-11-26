@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { enableSound } from './spatial-audio.js';
+import { enableSound } from '../../shared/audio/spatial-audio.js';
 
 const seats = 4;
 

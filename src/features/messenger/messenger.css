@@ -1,0 +1,14 @@
+@layer components {
+  .messenger-window {
+    --resize-min-width: 360px;
+    --resize-min-height: 285px;
+    width: var(--window-width, 41rem);
+    height: var(--window-height, 29rem);
+    min-width: min(var(--resize-min-width), calc(100vw - 2.25rem));
+    min-height: min(var(--resize-min-height), calc(100dvh - 2.25rem));
+    max-width: calc(100vw - 2.25rem);
+    max-height: calc(100dvh - 2.25rem);
+    overflow: hidden;
+  }
+  .messenger-window[open] { display: flex; flex-direction: column; }
+}
