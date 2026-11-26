@@ -6,7 +6,8 @@ import {addMeetingWindow} from './office-meeting-window.js';
 
 const seats = [[-1,-1],[1,-1],[-1,1],[1,1],[5,-1],[7,-1],[5,1],[7,1]];
 const colors = [0x89a8ce,0xe4a39e,0x8abdad,0xdfb181,0xab9fc1,0xe6b3a2,0x87b4bb,0xb895ba];
-let scene, camera, renderer, boss, latest, canvas, meetingWindow;
+let scene, camera, renderer, boss, latest, canvas, meetingWindow, updateSky, sun;
+let timeOfDay;
 let yaw=0, pitch=0, self=-1;
 let focus = false;
 let monitorFrameDrawn = false;
@@ -34,7 +35,7 @@ function init() {
   camera = new THREE.PerspectiveCamera(68,1,0.06,45);
   camera.rotation.order='YXZ';
   scene.add(new THREE.HemisphereLight(0xfff4df,0xb7b5c2,2.3));
-  const sun=new THREE.DirectionalLight(0xffecd3,1.8);
+  sun=new THREE.DirectionalLight(0xffecd3,1.8);
   sun.position.set(-4,7,4);
   sun.castShadow=true;
   sun.shadow.mapSize.set(1024,1024);
@@ -47,7 +48,9 @@ function init() {
   for (const z of [-5.5,5.5]) {
     box(scene,[18,3.6,0.15],[2,1.8,z],0xe2ddcf).castShadow=false;
   }
-  const dressDesk=furnish(scene);
+  const furniture = furnish(scene);
+  const { dressDesk } = furniture;
+  updateSky = furniture.updateSky;
   meetingWindow=addMeetingWindow(scene);
   for (const [i,[x,z]] of seats.entries()) {
     const forward=-Math.sign(z);
@@ -75,7 +78,7 @@ export function updateOffice(context) {
 
 function draw(now) {
   if (!latest) return;
-  const {packet, beatStarted, meetingStarts, seatLabels, youLabel} = latest;
+  const {packet, beatStarted, meetingStarts, seatLabels, youLabel, roundSeconds} = latest;
   const {step,walking} = packet;
   const meetingStarted = meetingStarts.values().next().value;
   meetingWindow.update(meetingStarted, now);
@@ -85,6 +88,12 @@ function draw(now) {
   const zoom = focusProgress(now);
   if (zoom === 1 && monitorFrameDrawn && w === width && h === height) return;
   monitorFrameDrawn = zoom === 1;
+  const elapsed = roundSeconds > 0 ? 1 - packet.remainingSeconds / roundSeconds : 0;
+  const daylight = THREE.MathUtils.smoothstep(elapsed, 0.12, 1);
+  timeOfDay = timeOfDay === undefined || Math.abs(daylight - timeOfDay) < 0.001
+    ? daylight : THREE.MathUtils.lerp(timeOfDay, daylight, 0.08);
+  updateSky(timeOfDay);
+  sun.intensity = THREE.MathUtils.lerp(1.8, 0.65, timeOfDay);
   if (w && h && (w!==width || h!==height)) {
     width=w; height=h;
     renderer.setSize(w,h,false);
@@ -116,6 +125,7 @@ function draw(now) {
 export function mountOffice(element) {
   canvas = element;
   width = height = 0;
+  timeOfDay = undefined;
   yaw = pitch = 0;
   focus = false;
   monitorFrameDrawn = false;

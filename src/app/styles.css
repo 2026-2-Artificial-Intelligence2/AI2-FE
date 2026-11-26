@@ -3,27 +3,95 @@
 @import "../features/office/office.css";
 @import "../features/messenger/messenger.css";
 @import "../features/market/market.css";
+@import "../features/lobby/lobby.css";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme inline {
+  --color-ui-desktop: var(--desktop-bg);
+  --color-ui-surface: var(--surface-bg);
+  --color-ui-subtle: var(--subtle-bg);
+  --color-ui-muted: var(--muted-bg);
+  --color-ui-track: var(--track-bg);
+  --color-ui-border: var(--surface-border);
+  --color-ui-input: var(--input-border);
+  --color-ui-text: var(--main-text);
+  --color-ui-secondary: var(--secondary-text);
+  --color-ui-caption: var(--caption-text);
+}
+
+:root {
+  color-scheme: light;
+  --desktop-bg: #f1f5f9;
+  --surface-bg: #fff;
+  --subtle-bg: #f8fafc;
+  --muted-bg: #f1f5f9;
+  --track-bg: #e2e8f0;
+  --surface-border: #e2e8f0;
+  --input-border: #cbd5e1;
+  --main-text: #0f172a;
+  --secondary-text: #475569;
+  --caption-text: #64748b;
+  --preview-bg: #e9edf4;
+  --preview-hover: #dfe5ef;
+  --preview-border: #a6afbf;
+  --preview-news: #64748b;
+  --preview-chat: #2563eb;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --desktop-bg: #101013;
+  --surface-bg: #17171C;
+  --subtle-bg: #17171C;
+  --muted-bg: #2B2B37;
+  --track-bg: #3B3C46;
+  --surface-border: #2B2B37;
+  --input-border: #3B3C46;
+  --main-text: #DFE2EB;
+  --secondary-text: #b9becd;
+  --caption-text: #a2a7b6;
+  --dark-selection: #2B2B37;
+  --dark-selection-hover: #3B3C46;
+  --dark-up: #F5445A;
+  --dark-down: #4491FF;
+  --dark-action: #3182F6;
+  --dark-safe: #009169;
+  --preview-bg: #2B2B37;
+  --preview-hover: #3B3C46;
+  --preview-border: #737888;
+  --preview-news: #737888;
+  --preview-chat: #3182F6;
+}
 
 @layer base {
   body {
-    @apply bg-slate-100 text-slate-900 antialiased;
+    @apply bg-ui-desktop text-ui-text antialiased;
     font-family: Inter, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   }
   button { @apply cursor-pointer disabled:cursor-not-allowed disabled:opacity-50; }
   button:focus-visible, select:focus-visible, input:focus-visible {
-    @apply outline-2 outline-offset-2 outline-blue-600;
+    @apply outline-2 outline-offset-2 outline-blue-600 dark:outline-[var(--dark-action)];
   }
 }
 
 @layer components {
-  .panel { @apply rounded-xl border border-slate-200 bg-white shadow-xs; }
-  .control { @apply rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold hover:bg-slate-50; }
-  .field { @apply rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm tabular-nums; }
-  .segments { @apply inline-flex rounded-lg bg-slate-100 p-0.5 text-sm; }
-  .segments button { @apply rounded-md px-3 py-1.5 font-semibold text-slate-600; }
-  .segments button[aria-pressed="true"] { @apply bg-white text-slate-900 shadow-xs; }
+  .panel { @apply rounded-xl border border-ui-border bg-ui-surface shadow-xs; }
+  .control { @apply rounded-lg border border-ui-input bg-ui-surface px-3 py-1.5 text-sm font-semibold hover:bg-ui-subtle; }
+  .field { @apply rounded-lg border border-ui-input bg-ui-surface px-3 py-2 text-sm tabular-nums; }
+  .segments { @apply inline-flex rounded-lg bg-ui-muted p-0.5 text-sm; }
+  .segments button { @apply rounded-md px-3 py-1.5 font-semibold text-ui-secondary; }
+  .segments button[aria-pressed="true"] { @apply bg-ui-surface text-ui-text shadow-xs; }
   .data-table { @apply w-full whitespace-nowrap text-left text-sm tabular-nums; }
-  .data-table th, .data-table td { @apply border-b border-slate-100 px-3 py-2; }
-  .data-table th { @apply bg-slate-50 text-xs text-slate-600; }
+  .data-table th, .data-table td { @apply border-b border-ui-border px-3 py-2; }
+  .data-table th { @apply bg-ui-subtle text-xs text-ui-secondary; }
 
+  .notification-preview {
+    @apply rounded-xl border border-l-[3px] p-3 text-left text-ui-text shadow-xl;
+    background: var(--preview-bg);
+    border-color: var(--preview-border);
+  }
+  .notification-preview--news { border-left-color: var(--preview-news); }
+  .notification-preview--chat { border-left-color: var(--preview-chat); }
+  button.notification-preview:hover { background: var(--preview-hover); }
 }

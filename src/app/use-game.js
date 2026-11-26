@@ -24,6 +24,7 @@ function reduce(game, message, receivedAt) {
       return {
         ...(message.room.startedAt ? game : {
           ...initial, chats: game.room?.code === message.code ? game.chats : [],
+          micLevels: game.room?.code === message.code ? game.micLevels : undefined,
         }),
         status: message.room.startedAt ? (game.result ? game.status : '게임 진행 중') : '시작 대기 중',
         connected: true,
@@ -32,7 +33,7 @@ function reduce(game, message, receivedAt) {
     case 'chart': return { ...game, candles: message.candles, candleSeconds: message.candleSeconds };
     case 'catalog': return { ...game, stocks: message.stocks, feeBps: message.feeBps, margin: message.margin, loan: message.loan };
     case 'market': return {
-      ...game, view: message.view, market: message,
+      ...game, view: message.view, market: message, micLevels: message.micLevels ?? game.micLevels,
       candles: mergeCandles(game.candles, message.candles),
     };
     case 'work': {
@@ -58,6 +59,13 @@ function reduce(game, message, receivedAt) {
     case 'chatHistory': return { ...game, chats: message.messages, chatHistoryEnd: message.messages.at(-1)?.id ?? 0 };
     case 'chat': return { ...game, chats: [...game.chats, message.message].slice(-300) };
     case 'leakSent': return { ...game, leakReceipt: message };
+    case 'mic': {
+      const micLevels = { ...game.micLevels };
+      if (message.on) micLevels[message.player] = message.level;
+      else delete micLevels[message.player];
+      return { ...game, micLevels };
+    }
+    case 'workError': return { ...game, workError: message };
     case 'error': return { ...game, lastError: message, status: message.message };
     case 'dismissNews': return { ...game, popup: null };
     case 'newsHistory': return { ...game, history: message.items };
@@ -71,8 +79,10 @@ export function useGame() {
   const [game, setGame] = useState(initial);
   const socket = useRef(null);
   const office = useRef(null);
+  const workRequest = useRef(null);
   const send = useCallback(command => {
     if (socket.current?.readyState !== WebSocket.OPEN) return false;
+    if (command.startsWith('WORK ')) workRequest.current = Number(command.split(' ', 3)[1]);
     socket.current.send(command);
     return true;
   }, []);
@@ -95,6 +105,7 @@ export function useGame() {
     let beatStarted = 0;
     let seatLabels = [];
     let roomStartedAt;
+    let roundSeconds;
     let youLabel;
 
     function connect() {
@@ -111,12 +122,22 @@ export function useGame() {
       };
       connection.onmessage = event => {
         if (stopped) return;
-        const message = JSON.parse(event.data);
+        let message = JSON.parse(event.data);
+        if (workRequest.current !== null) {
+          if (message.type === 'error') {
+            message = { ...message, type: 'workError' };
+            workRequest.current = null;
+          } else if ((message.type === 'work' && message.desk.task.number > workRequest.current) ||
+              ['meeting', 'result', 'closed', 'resumeFailed'].includes(message.type)) {
+            workRequest.current = null;
+          }
+        }
         const receivedAt = performance.now();
         if (message.type === 'state') {
           sessionStorage.setItem(seatKey, JSON.stringify({ code: message.code, token: message.token }));
           retries = 0;
           youLabel = message.youLabel;
+          roundSeconds = message.sessionSeconds;
           if (roomStartedAt !== message.room.startedAt) {
             roomStartedAt = message.room.startedAt;
             seatLabels = roomStartedAt ? (message.members ?? []).map(member => member.label) : [];
@@ -143,7 +164,7 @@ export function useGame() {
           for (const colleague of message.colleagues ?? []) {
             if (colleague.meeting) meetingStarts.set(colleague.label, previous?.meetingStarts.get(colleague.label) ?? receivedAt);
           }
-          office.current = { packet: message, beatStarted, meetingStarts, seatLabels, youLabel };
+          office.current = { packet: message, beatStarted, meetingStarts, seatLabels, youLabel, roundSeconds };
           if (message.walking && lastStep !== message.beat && message.step) {
             lastStep = message.beat;
             footsteps(message.step);
@@ -173,6 +194,7 @@ export function useGame() {
         });
       };
       connection.onclose = () => {
+        workRequest.current = null;
         if (stopped) return;
         const retry = savedSeat() && !replaced && retries < 30;
         setGame(game => ({

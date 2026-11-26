@@ -27,7 +27,7 @@ export function LoanDialog({ game, send, onDismiss }) {
 
   return <Dialog id="loan-dialog" title="비상 대출" pending={pending} onDismiss={onDismiss}>
     {repayment ? <div className="space-y-4 p-5">
-      <p role="status" className="rounded-lg bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-900">
+      <p role="status" className="rounded-lg bg-indigo-50 dark:bg-[var(--dark-selection)] px-3 py-2 text-sm font-semibold text-indigo-900 dark:text-indigo-200">
         이번 판 비상 대출을 받았어요.
       </p>
       <dl className="space-y-2 text-sm tabular-nums">
@@ -36,7 +36,7 @@ export function LoanDialog({ game, send, onDismiss }) {
       </dl>
       <button type="button" className="control w-full" onClick={onDismiss}>확인</button>
     </div> : <form className="space-y-4 p-5" onSubmit={submit}>
-      <p className="text-sm text-slate-600">한 판에 한 번 받을 수 있어요. 대출을 받으면 같은 방의 직원들에게 알려져요.</p>
+      <p className="text-sm text-ui-secondary">한 판에 한 번 받을 수 있어요. 대출을 받으면 같은 방의 직원들에게 알려져요.</p>
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
         <span>최대 <b>{won(cap)}</b></span>
         <span>이자율 <b>{loan.interestPercent}%</b></span>
@@ -49,19 +49,19 @@ export function LoanDialog({ game, send, onDismiss }) {
           <button className="control shrink-0" type="button" disabled={pending || !connected}
             onClick={() => setDraft(String(cap))}>최대 금액</button>
         </div>
-        {draft && !valid && <p className="text-xs text-rose-700">1원에서 {won(cap)} 사이의 정수를 입력해 주세요.</p>}
+        {draft && !valid && <p className="text-xs text-rose-700 dark:text-rose-300">1원에서 {won(cap)} 사이의 정수를 입력해 주세요.</p>}
       </div>
-      <dl className="space-y-2 rounded-lg bg-slate-50 px-3 py-3 text-sm tabular-nums">
+      <dl className="space-y-2 rounded-lg bg-ui-subtle px-3 py-3 text-sm tabular-nums">
         <div className="flex justify-between gap-2"><dt>이자</dt><dd>{valid ? won(interest) : '—'}</dd></div>
-        <div className="flex justify-between gap-2 border-t border-slate-200 pt-2 font-bold">
+        <div className="flex justify-between gap-2 border-t border-ui-border pt-2 font-bold">
           <dt>퇴근 때 상환</dt><dd data-loan-repayment>{valid ? won(amount + interest) : '—'}</dd>
         </div>
       </dl>
-      {error && <p className="text-sm text-rose-700" role="alert">{error}</p>}
+      {error && <p className="text-sm text-rose-700 dark:text-rose-300" role="alert">{error}</p>}
       <div className="flex justify-end gap-2">
         <button type="button" className="control" disabled={pending} onClick={onDismiss}>취소</button>
         <button type="submit" disabled={!valid || !connected || pending}
-          className="rounded-lg bg-indigo-700 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-800">
+          className="rounded-lg bg-indigo-700 dark:bg-[#3d3b50] dark:hover:bg-[#4a4860] px-4 py-2 text-sm font-bold text-white hover:bg-indigo-800">
           {pending ? '신청 중…' : '대출 받기'}
         </button>
       </div>

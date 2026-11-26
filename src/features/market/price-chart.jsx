@@ -1,14 +1,26 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { clock, number } from '../../shared/format.js';
 
-export function PriceChart({ candles, seconds, price, name }) {
+const chartColors = {
+  light: {
+    grid: '#e8edf4', vertical: '#edf1f6', labels: '#64748b',
+    up: '#cf304d', down: '#2d65cc', flat: '#738298', line: '#334155', badge: '#18263c', badgeText: '#fff',
+  },
+  dark: {
+    grid: '#2B2B37', vertical: '#2B2B37', labels: '#a2a7b6',
+    up: '#F04452', down: '#3182F6', flat: '#737888', line: '#737888', badge: '#3B3C46', badgeText: '#DFE2EB',
+  },
+};
+
+export function PriceChart({ candles, seconds, price, name, theme = 'light' }) {
   const [view, setView] = useState({ range: 60, end: null });
   const drag = useRef(null);
   const canvas = useRef(null);
   const count = Math.min(view.range, candles.length);
   const end = Math.max(count, Math.min(view.end ?? candles.length, candles.length));
-  const points = candles.slice(end - count, end);
+  const points = useMemo(() => candles.slice(end - count, end), [candles, count, end]);
   const historical = end < candles.length;
+  const hasPoints = points.length > 0;
 
   function pan(target) {
     const nextEnd = Math.max(count, Math.min(target, candles.length));
@@ -26,12 +38,13 @@ export function PriceChart({ candles, seconds, price, name }) {
     }
     element.addEventListener('wheel', wheel, { passive: false });
     return () => element.removeEventListener('wheel', wheel);
-  }, [points.length > 0]);
+  }, [hasPoints]);
 
   useEffect(() => {
     const element = canvas.current;
     if (!element) return;
     function draw() {
+      const color = chartColors[theme];
       const reference = historical ? points.at(-1)?.close : price;
       const { width, height } = element.getBoundingClientRect();
       if (!width || !height || !points.length) return;
@@ -62,9 +75,9 @@ export function PriceChart({ candles, seconds, price, name }) {
       for (let index = 0; index < 5; index++) {
         const value = max - (max - min) * index / 4;
         const row = y(value);
-        line(left, row, right, row, '#e8edf4');
+        line(left, row, right, row, color.grid);
         if (Math.abs(row - y(reference)) > 13) {
-          ctx.fillStyle = '#64748b';
+          ctx.fillStyle = color.labels;
           ctx.fillText(number(Math.round(value)), right + 7, row);
         }
       }
@@ -73,22 +86,22 @@ export function PriceChart({ candles, seconds, price, name }) {
       for (let index = 0; index < markerCount; index++) {
         const slot = markerCount === 1 ? 0 : Math.round(index * (points.length - 1) / (markerCount - 1));
         const x = left + (slot + 0.5) * step;
-        line(x, top, x, volumeEnd, '#edf1f6');
-        ctx.fillStyle = '#64748b';
+        line(x, top, x, volumeEnd, color.vertical);
+        ctx.fillStyle = color.labels;
         ctx.textAlign = 'center';
         ctx.fillText(clock(points[slot].startSecond), Math.min(right - 17, Math.max(28, x)), height - 13);
       }
       ctx.textAlign = 'start';
-      line(left, bottom + 15, right, bottom + 15, '#e8edf4');
-      ctx.fillStyle = '#64748b';
+      line(left, bottom + 15, right, bottom + 15, color.grid);
+      ctx.fillStyle = color.labels;
       ctx.fillText('거래량', left, bottom + 27);
 
       points.forEach((point, index) => {
         const x = left + (index + 0.5) * step;
         const body = Math.max(1, Math.min(15, step * 0.68));
-        const color = point.close > point.open ? '#cf304d' : point.close < point.open ? '#2d65cc' : '#738298';
-        line(x, y(point.high), x, y(point.low), color);
-        ctx.fillStyle = color;
+        const candleColor = point.close > point.open ? color.up : point.close < point.open ? color.down : color.flat;
+        line(x, y(point.high), x, y(point.low), candleColor);
+        ctx.fillStyle = candleColor;
         ctx.fillRect(x - body / 2, Math.min(y(point.open), y(point.close)), body,
           Math.max(1.5, Math.abs(y(point.open) - y(point.close))));
         const volume = point.volume / volumeMax * (volumeEnd - bottom - 38);
@@ -98,22 +111,22 @@ export function PriceChart({ candles, seconds, price, name }) {
       });
 
       ctx.setLineDash([4, 4]);
-      line(left, y(reference), right, y(reference), '#334155');
+      line(left, y(reference), right, y(reference), color.line);
       ctx.setLineDash([]);
-      ctx.fillStyle = '#18263c';
+      ctx.fillStyle = color.badge;
       ctx.fillRect(right, y(reference) - 9, width - right, 18);
-      ctx.fillStyle = '#fff';
+      ctx.fillStyle = color.badgeText;
       ctx.fillText(number(reference), right + 4, y(reference), width - right - 8);
     }
     const observer = new ResizeObserver(draw);
     observer.observe(element);
     draw();
     return () => observer.disconnect();
-  }, [points, price, historical]);
+  }, [points, price, historical, theme]);
 
-  return <section className="panel min-w-0 p-4 lg:p-5">
-    <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-      <h3 className="font-bold">가격 차트 <span className="ml-1 text-xs font-normal text-slate-500">{seconds}초봉</span></h3>
+  return <section className="panel market-panel flex min-w-0 flex-col p-4 lg:p-5">
+    <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3">
+      <h3 className="font-bold">가격 차트 <span className="ml-1 text-xs font-normal text-ui-caption">{seconds}초봉</span></h3>
       <div className="segments" aria-label="차트 조작">
         <button type="button" aria-label="이전 봉" onClick={() => pan(end - Math.ceil(count / 3))}>◀</button>
         <button type="button" aria-label="다음 봉" onClick={() => pan(end + Math.ceil(count / 3))}>▶</button>
@@ -122,7 +135,7 @@ export function PriceChart({ candles, seconds, price, name }) {
         <button type="button" aria-pressed={!historical} onClick={() => setView(current => ({ ...current, end: null }))}>실시간</button>
       </div>
     </div>
-    {points.length ? <canvas ref={canvas} className="block h-[340px] w-full touch-none cursor-grab active:cursor-grabbing lg:h-[390px]"
+    {points.length ? <canvas ref={canvas} className="block min-h-0 w-full flex-1 touch-none cursor-grab active:cursor-grabbing"
       role="img" aria-label={name + ' 가격과 거래량 차트. 드래그로 이동, 휠로 확대 및 축소'}
       onPointerDown={event => {
         if (event.button !== 0) return;
@@ -134,6 +147,6 @@ export function PriceChart({ candles, seconds, price, name }) {
         if (pointer?.id === event.pointerId) pan(pointer.end - Math.round((event.clientX - pointer.x) * count / pointer.width));
       }}
       onLostPointerCapture={() => { drag.current = null; }}
-    /> : <p className="p-4 text-sm text-slate-500">차트 데이터를 기다리는 중입니다.</p>}
+    /> : <p className="p-4 text-sm text-ui-caption">차트 데이터를 기다리는 중입니다.</p>}
   </section>;
 }

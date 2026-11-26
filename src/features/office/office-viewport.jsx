@@ -55,7 +55,7 @@ export function OfficeViewport({ office, market, players, focused, looking, onRe
     />
     {looking && <footer>
       <span>드래그해서 둘러보기</span>
-      <button id="back" className="control text-slate-900" type="button" onClick={onReturn}>모니터 보기 <KeyHint>Q</KeyHint></button>
+      <button id="back" className="control text-ui-text" type="button" onClick={onReturn}>모니터 보기 <KeyHint>Q</KeyHint></button>
     </footer>}
   </section>;
 }

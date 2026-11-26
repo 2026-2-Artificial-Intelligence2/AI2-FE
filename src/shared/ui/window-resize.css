@@ -1,6 +1,6 @@
 @layer components {
   .resize-grip {
-    @apply absolute z-10 grid size-6 touch-none select-none place-items-center rounded-sm text-lg leading-none text-slate-600 hover:bg-slate-200;
+    @apply absolute z-10 grid size-6 touch-none select-none place-items-center rounded-sm text-lg leading-none text-ui-secondary hover:bg-ui-track;
     cursor: nwse-resize;
   }
   .resize-grip-top { inset: 0 auto auto 0; }

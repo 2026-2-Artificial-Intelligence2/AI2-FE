@@ -57,9 +57,14 @@ export function Order({ game, symbol, mode, setMode, limit, setLimit, name, acti
   const position = market.portfolio.positions[symbol];
   const limitOrder = mode === 'LIMIT', cashOrder = mode === 'AMOUNT' && buy;
   const multiple = buy && !limitOrder && margin?.leverages.includes(leverage) ? leverage : 1;
-  const useAll = all && (buy ? cashOrder : mode === 'MARKET');
-  const value = useAll ? (buy ? (cash > 0n ? cash : 0n) : available)
-    : positive(cashOrder ? amount : quantity);
+  const useAll = all && !limitOrder;
+  const spendable = cash > 0n ? cash : 0n;
+  const maxBuy = useAll && buy && !cashOrder
+    ? estimate({ pool: market.pools[symbol], buy, mode: 'AMOUNT', value: spendable,
+      feeBps, cash, available, leverage: multiple, position }).quantity ?? 0n
+    : 0n;
+  const allValue = buy ? (cashOrder ? spendable : maxBuy) : available;
+  const value = useAll ? allValue : positive(cashOrder ? amount : quantity);
   const quote = estimate({ pool: market.pools[symbol], buy, mode, value, limit: positive(limit),
     feeBps, cash, available, leverage: multiple, position });
   const submitDisabled = !active || !connected || !desk || !quote.quantity || Boolean(quote.error);
@@ -73,10 +78,10 @@ export function Order({ game, symbol, mode, setMode, limit, setLimit, name, acti
 
   function selectAll() {
     setAll(true);
-    setMode(buy ? 'AMOUNT' : 'MARKET');
+    if (limitOrder) setMode('MARKET');
   }
   function changeQuantity(change) {
-    const next = (useAll ? available : positive(quantity)) + change;
+    const next = (useAll ? allValue : positive(quantity)) + change;
     setAll(false);
     setQuantity(String(next < 1n ? 1n : next));
   }
@@ -89,65 +94,76 @@ export function Order({ game, symbol, mode, setMode, limit, setLimit, name, acti
     send(command.join(' '));
   }
 
-  return <section className="panel p-4">
-    <h3 className="mb-3 font-bold">주문</h3>
-    <form className="space-y-3" onSubmit={submit}>
-      <div className="segments grid grid-cols-2" aria-label="주문 방향">
+  return <section className="panel market-panel market-order flex min-w-0 flex-col p-4">
+    <h3 className="mb-3 shrink-0 font-bold">주문</h3>
+    <form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>
+      <div className="segments mb-2 grid shrink-0 grid-cols-2" aria-label="주문 방향">
         <button type="button" className="buy" aria-pressed={buy} aria-keyshortcuts="B" onClick={() => selectSide('BUY')}>매수 <KeyHint>B</KeyHint></button>
         <button type="button" className="sell" aria-pressed={!buy} aria-keyshortcuts="S" onClick={() => selectSide('SELL')}>매도 <KeyHint>S</KeyHint></button>
       </div>
-      <label className="block text-sm font-medium">주문 유형
-        <select className="field mt-1 w-full" value={mode} onChange={event => { setAll(false); setMode(event.target.value); }}>
-          <option value="MARKET">수량 시장가</option>{buy && <option value="AMOUNT">금액 시장가</option>}
-          <option value="LIMIT">지정가</option>
-        </select>
-      </label>
-      {buy && !limitOrder && margin?.leverages.length > 0 && <label className="block text-sm font-medium">매수 방식
-        <select className="field mt-1 w-full" value={multiple} onChange={event => setLeverage(Number(event.target.value))}>
-          <option value="1">현금</option>
-          {margin.leverages.map(value => <option key={value} value={value}>신용 {value}배</option>)}
-        </select>
-      </label>}
-      {limitOrder && <label className="block text-sm font-medium">지정가 (원)
-        <input id="limit" className="field mt-1 w-full" type="number" min="1" step="1" required value={limit}
-          onChange={event => setLimit(event.target.value)} />
-      </label>}
-      <label className="block text-sm font-medium">{cashOrder ? '내 돈 기준 주문 금액 (원)' : '수량 (주)'}
-        <input id={cashOrder ? 'order-amount' : 'quantity'} className="field mt-1 w-full" type="number" min="1" step="1" required
-          value={cashOrder ? (useAll ? String(value) : amount) : (useAll ? String(value) : quantity)}
-          onChange={event => { setAll(false); (cashOrder ? setAmount : setQuantity)(event.target.value); }} />
-      </label>
-      <div className="flex flex-wrap gap-1">
-        {!cashOrder && <>
-          <button type="button" className="control px-2" aria-label="수량 10주 줄이기" onClick={() => changeQuantity(-10n)}>−10</button>
-          <button type="button" className="control px-2" aria-label="수량 10주 늘리기" onClick={() => changeQuantity(10n)}>+10</button>
-        </>}
-        <button type="button" className="control px-2" aria-pressed={useAll} onClick={selectAll}
-          disabled={buy ? cash <= 0n : available <= 0n}>{buy ? '전량 매수' : '전량 매도'}</button>
+      <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-0.5 pb-2 pt-0.5">
+        <div className="grid grid-cols-2 gap-2">
+          <label className="block min-w-0 text-xs font-semibold">주문 유형
+            <select className="field mt-1 w-full px-2" value={mode} onChange={event => { setAll(false); setMode(event.target.value); }}>
+              <option value="MARKET">수량 시장가</option>{buy && <option value="AMOUNT">금액 시장가</option>}
+              <option value="LIMIT">지정가</option>
+            </select>
+          </label>
+          {buy && !limitOrder && margin?.leverages.length > 0 && <label className="block min-w-0 text-xs font-semibold">매수 방식
+            <select className="field mt-1 w-full px-2" value={multiple} onChange={event => setLeverage(Number(event.target.value))}>
+              <option value="1">현금</option>
+              {margin.leverages.map(value => <option key={value} value={value}>신용 {value}배</option>)}
+            </select>
+          </label>}
+          {limitOrder && <label className="block min-w-0 text-xs font-semibold">지정가 (원)
+            <input id="limit" className="field mt-1 w-full px-2" type="number" min="1" step="1" required value={limit}
+              onChange={event => setLimit(event.target.value)} />
+          </label>}
+        </div>
+        <div>
+          <label className="block text-xs font-semibold" htmlFor={cashOrder ? 'order-amount' : 'quantity'}>
+            {cashOrder ? '내 돈 기준 주문 금액 (원)' : '수량 (주)'}
+          </label>
+          <div className="mt-1 flex items-stretch gap-1">
+            <input id={cashOrder ? 'order-amount' : 'quantity'} className="field min-w-0 flex-1 px-2" type="number" min="1" step="1" required
+              value={useAll ? String(value) : cashOrder ? amount : quantity}
+              onChange={event => { setAll(false); (cashOrder ? setAmount : setQuantity)(event.target.value); }} />
+            {!cashOrder && <>
+              <button type="button" className="control shrink-0 px-1.5 text-xs" aria-label="수량 10주 줄이기" onClick={() => changeQuantity(-10n)}>−10</button>
+              <button type="button" className="control shrink-0 px-1.5 text-xs" aria-label="수량 10주 늘리기" onClick={() => changeQuantity(10n)}>+10</button>
+            </>}
+            <button type="button" className="control shrink-0 px-1.5 text-xs" aria-pressed={useAll} onClick={selectAll}
+              disabled={buy ? cash <= 0n : available <= 0n}>{buy ? '전량 매수' : '전량 매도'}</button>
+          </div>
+        </div>
+        <dl className="space-y-2 border-t border-ui-border pt-3 text-sm tabular-nums">
+          <div className="flex justify-between gap-2"><dt className="text-ui-secondary">주문 가능 현금</dt><dd id="cash">{won(cash)}</dd></div>
+          <div className="flex justify-between gap-2"><dt className="text-ui-secondary">매도 가능 수량</dt><dd>{number(available)}주</dd></div>
+          {quote.total !== undefined && <div className="flex justify-between gap-2 font-bold">
+            <dt>{limitOrder ? buy ? '주문에 묶일 현금' : '지정가 기준 수령액' : '예상 체결 금액'}</dt><dd>{won(quote.total)}</dd>
+          </div>}
+          {cashOrder && quote.quantity > 0n && <div className="flex justify-between gap-2"><dt>예상 매수 수량</dt><dd>{number(quote.quantity)}주</dd></div>}
+          {multiple > 1 && quote.own !== null && quote.own !== undefined && <>
+            <div className="flex justify-between gap-2"><dt>예상 내 돈</dt><dd>{won(quote.own)}</dd></div>
+            <div className="flex justify-between gap-2"><dt>예상 신용 빚</dt><dd>{won(quote.total - quote.own)}</dd></div>
+          </>}
+          {quote.repaid > 0n && <div className="flex justify-between gap-2"><dt>예상 빚 상환</dt><dd>{won(quote.repaid)}</dd></div>}
+        </dl>
+        {multiple > 1 && <p className="text-xs text-ui-secondary">담보 비율 {margin.maintenancePercent}% 미만이면 반대매매돼요.
+          {' '}분당 이자 {(margin.interestBpsPerMinute / 100).toFixed(2)}%.</p>}
+        {fill && <p id="fill" role="status" className="rounded bg-ui-muted p-2 text-xs">
+          {name(fill.symbol)} {fill.quantity}주 {fill.side} 체결 · {won(fill.amount)}
+          {fill.borrowedWon > 0 && ' · 신용 빚 ' + won(fill.borrowedWon)}
+          {fill.debtRepaidWon > 0 && ' · 빚 상환 ' + won(fill.debtRepaidWon)}
+        </p>}
       </div>
-      <dl className="space-y-2 border-t border-slate-200 pt-3 text-sm tabular-nums">
-        <div className="flex justify-between gap-2"><dt className="text-slate-600">주문 가능 현금</dt><dd id="cash">{won(cash)}</dd></div>
-        <div className="flex justify-between gap-2"><dt className="text-slate-600">매도 가능 수량</dt><dd>{number(available)}주</dd></div>
-        {quote.total !== undefined && <div className="flex justify-between gap-2 font-bold">
-          <dt>{limitOrder ? buy ? '주문에 묶일 현금' : '지정가 기준 수령액' : '예상 체결 금액'}</dt><dd>{won(quote.total)}</dd>
-        </div>}
-        {cashOrder && quote.quantity > 0n && <div className="flex justify-between gap-2"><dt>예상 매수 수량</dt><dd>{number(quote.quantity)}주</dd></div>}
-        {multiple > 1 && quote.own !== null && quote.own !== undefined && <>
-          <div className="flex justify-between gap-2"><dt>예상 내 돈</dt><dd>{won(quote.own)}</dd></div>
-          <div className="flex justify-between gap-2"><dt>예상 신용 빚</dt><dd>{won(quote.total - quote.own)}</dd></div>
-        </>}
-        {quote.repaid > 0n && <div className="flex justify-between gap-2"><dt>예상 빚 상환</dt><dd>{won(quote.repaid)}</dd></div>}
-      </dl>
-      {multiple > 1 && <p className="text-xs text-slate-600">담보 비율 {margin.maintenancePercent}% 미만이면 반대매매돼요.
-        {' '}분당 이자 {(margin.interestBpsPerMinute / 100).toFixed(2)}%.</p>}
-      <button className={`w-full rounded-lg px-3 py-2.5 font-bold text-white ${buy ? 'bg-rose-700' : 'bg-blue-700'}`}
+      <p className={`my-2 min-h-8 shrink-0 text-xs ${quote.error ? 'text-rose-700 dark:text-rose-300' : 'text-ui-secondary'}`}>
+        {quote.error ?? '거래 비용 포함 · 체결 금액은 시세에 따라 달라질 수 있습니다.'}
+      </p>
+      <button className={`w-full shrink-0 rounded-lg px-3 py-2.5 font-bold text-white ${buy
+        ? 'bg-rose-700 dark:bg-ui-desktop dark:text-[var(--dark-up)] dark:ring-1 dark:ring-inset dark:ring-ui-input dark:hover:ring-[var(--dark-up)]'
+        : 'bg-blue-700 dark:bg-ui-desktop dark:text-[var(--dark-down)] dark:ring-1 dark:ring-inset dark:ring-ui-input dark:hover:ring-[var(--dark-down)]'}`}
         type="submit" disabled={submitDisabled}>{buy ? '매수 주문' : '매도 주문'}</button>
-      <p className="text-xs text-slate-600">{quote.error ?? '거래 비용 포함 · 체결 금액은 시세에 따라 달라질 수 있습니다.'}</p>
     </form>
-    {fill && <p id="fill" role="status" className="mt-3 text-sm">
-      {name(fill.symbol)} {fill.quantity}주 {fill.side} 체결 · {won(fill.amount)}
-      {fill.borrowedWon > 0 && ' · 신용 빚 ' + won(fill.borrowedWon)}
-      {fill.debtRepaidWon > 0 && ' · 빚 상환 ' + won(fill.debtRepaidWon)}
-    </p>}
   </section>;
 }
