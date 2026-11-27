@@ -6,10 +6,11 @@ import {DESK_DROP, OFFICE_CENTER_X, OFFICE_HALF_DEPTH, OFFICE_LENGTH, SUN_PATH, 
 import {fitDeskWorker} from './office-seating.js';
 import {turnListener} from '../../shared/audio/spatial-audio.js';
 import {addMeetingWindow} from './office-meeting-window.js';
-import {finishWalls} from './office-walls.js';
+import {finishFloor, finishWalls} from './office-walls.js';
 import {dayCurve} from './window-sky.js';
 
-const SUN_INTENSITY = [[0, 2.0], [0.3, 2.35], [0.6, 2.1], [0.8, 1.35], [1, 0.4]];
+// The sun sets before quitting time, so its light and shadows are gone by night.
+const SUN_INTENSITY = [[0, 2.0], [0.3, 2.35], [0.6, 2.1], [0.8, 1.3], [0.92, 0], [1, 0]];
 const SUN_COLOR = [[0, [1, 0.9, 0.78]], [0.3, [1, 0.92, 0.8]], [0.6, [1, 0.86, 0.68]], [0.8, [1, 0.66, 0.42]], [1, [0.72, 0.68, 0.85]]];
 const SKY_INTENSITY = [[0, 2.65], [0.3, 2.8], [0.7, 2.6], [1, 2.0]];
 import {makeVoiceTextures, voiceArcCount} from './office-voice.js';
@@ -59,7 +60,7 @@ function init() {
   sun.shadow.intensity=0.82;
   sun.shadow.normalBias=0.022;
   scene.add(sun);
-  box(scene,[OFFICE_LENGTH,0.1,OFFICE_HALF_DEPTH*2+0.2],[OFFICE_CENTER_X,-0.05,0],0xb8a58e);
+  const unfinishFloor = finishFloor(box(scene,[OFFICE_LENGTH,0.1,OFFICE_HALF_DEPTH*2+0.2],[OFFICE_CENTER_X,-0.05,0],0xb8a58e));
   const furniture = furnish(scene, () => { monitorFrameDrawn = false; });
   const { dressDesk } = furniture;
   updateSky = furniture.updateSky;
@@ -90,7 +91,7 @@ function init() {
   }
   boss=glbActor(BOSS);
   scene.add(boss.root);
-  return { ...furniture, dispose() { furniture.dispose(); unfinishWalls(); } };
+  return { ...furniture, dispose() { furniture.dispose(); unfinishWalls(); unfinishFloor(); } };
 }
 
 // Rigged staff sit at their desks; a slow head sway keeps them from looking frozen.
