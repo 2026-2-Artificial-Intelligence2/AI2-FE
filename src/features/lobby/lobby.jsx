@@ -205,7 +205,7 @@ function Players({ members, you }) {
               <span
                 aria-hidden='true'
                 className={'grid size-10 shrink-0 place-items-center rounded-lg text-sm font-bold ' + (member ? 'bg-slate-900 text-white' : 'bg-ui-surface text-ui-caption ring-1 ring-ui-border')}>
-                {member?.label ?? '+'}
+                {Array.from(member?.label?.normalize('NFC').trim() ?? '')[0] ?? '+'}
               </span>
               {member ? (
                 <div>

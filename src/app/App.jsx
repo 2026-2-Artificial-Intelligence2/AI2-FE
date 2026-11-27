@@ -178,7 +178,8 @@ export function App() {
     {officeActive && <OfficeViewport office={office} market={market} players={room.room.players}
       micLevels={connected ? game.micLevels : undefined}
       looking={looking} focused={!looking} onReady={setOfficeReady} onReturn={returnToMonitor} />}
-    {view === 'MEETING' && <Meeting reason={game.meeting} startedAt={game.meetingStarted} />}
+    {view === 'MEETING' && <Meeting key={game.meetingStarted + ':' + game.meetingCharacter}
+      reason={game.meeting} startedAt={game.meetingStarted} character={game.meetingCharacter} />}
     <main inert={!desktopInteractive} data-monitor={desktopShown}
       className={(officeActive ? 'game-desktop ' : '') + 'min-h-screen'}>
       <div className="mx-auto max-w-[1520px] space-y-4 px-4 py-5 sm:px-7">
@@ -195,7 +196,11 @@ export function App() {
           {room && !startingSolo && <div className="col-span-full flex min-w-0 items-center gap-1.5 text-sm sm:flex-wrap sm:gap-2">
             {market && !result && <span id="clock" className="flex shrink-0 flex-col leading-tight tabular-nums sm:flex-row sm:items-center sm:gap-1">
               <span className="text-xs text-ui-secondary sm:text-sm sm:text-ui-text">퇴근까지</span>
-              <b className={closingSoon ? 'text-rose-700 dark:text-rose-300 sm:text-ui-text' : undefined}>{clock(market.remainingSeconds)}</b>
+              <b className={'grid shrink-0 whitespace-nowrap ' +
+                (closingSoon ? 'text-rose-700 dark:text-rose-300 sm:text-ui-text' : '')}>
+                <span aria-hidden="true" className="invisible col-start-1 row-start-1">00:00</span>
+                <span className="col-start-1 row-start-1">{clock(market.remainingSeconds)}</span>
+              </b>
               {closingSoon && <span className="sr-only text-rose-700 sm:not-sr-only sm:ml-1 dark:text-rose-300">장 마감 임박</span>}
             </span>}
             {canOpenMessengerPopup && <button className={headerControl} disabled={!connected} aria-haspopup="dialog"

@@ -13,13 +13,14 @@ export function addMeetingWindow(office) {
   const actors = new THREE.Group();
   actors.visible = false;
   room.add(actors);
-  const animate = createMeetingPerformance(actors);
+  const sequence = createMeetingPerformance(actors);
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const wallX = -6.9;
-  box(office, [0.14, 3.65, 5.2], [wallX, 1.82, 2.9], 0xd2d9d2).castShadow = false;
+  // Solid walls block the sun so it only reaches the office through the outside windows.
+  box(office, [0.14, 3.65, 5.2], [wallX, 1.82, 2.9], 0xd2d9d2);
   box(office, [0.14, 0.06, 5.8], [wallX, 0.03, centreZ], 0xb8c8cf);
-  box(office, [0.14, 1.06, 5.8], [wallX, 3.12, centreZ], 0xd2d9d2).castShadow = false;
+  box(office, [0.14, 1.06, 5.8], [wallX, 3.12, centreZ], 0xd2d9d2);
   for (const offset of [-2.86, 2.86]) {
     box(office, [0.17, 2.55, 0.10], [wallX, 1.32, centreZ + offset], 0x4e6572);
   }
@@ -33,6 +34,7 @@ export function addMeetingWindow(office) {
   glass.rotation.y = Math.PI / 2;
   glass.position.set(wallX + 0.09, 1.32, centreZ);
   glass.userData.disposeWithOffice = true;
+  glass.castShadow = true;   // the meeting room is indoors: no sun through it
   office.add(glass);
   const sheen = glass.clone();
   sheen.geometry = glass.geometry.clone();
@@ -44,9 +46,12 @@ export function addMeetingWindow(office) {
   office.add(sheen);
 
   return {
-    update(meetingStarted, now) {
-      actors.visible = meetingStarted !== undefined;
-      if (actors.visible) animate(Math.max(0, (now - meetingStarted) / 1000), reducedMotion);
+    update(meeting, now) {
+      actors.visible = Boolean(meeting);
+      if (!meeting) return;
+      sequence.setPlayer(meeting.character);
+      sequence.update(Math.max(0, (now - meeting.startedAt) / 1000), reducedMotion);
     },
+    dispose: sequence.dispose,
   };
 }
