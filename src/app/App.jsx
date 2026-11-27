@@ -7,7 +7,7 @@ import { SettingsPanel } from './settings-panel.jsx';
 import { BossNearby } from './boss-nearby.jsx';
 import { GameGauges } from './game-gauges.jsx';
 import { enableSound, sfx } from '../shared/audio/spatial-audio.js';
-import { duckMusic, setOfficeMusic } from '../shared/audio/music.js';
+import { duckMusic, setMusic } from '../shared/audio/music.js';
 import { clock } from '../shared/format.js';
 import { Market } from '../features/market/market.jsx';
 import { Work } from '../features/work/work.jsx';
@@ -43,10 +43,16 @@ export function App() {
   useEffect(() => {
     if (import.meta.env.DEV) window.officeVoice = voice;
   });
-  // 근무 중(출근부터 퇴근까지)에만 사무실 음악. 부장님이 걷는 동안은 발소리가 묻히지 않게 줄인다.
-  const musicOn = Boolean(room?.room.startedAt && !result && connected);
-  useEffect(() => { setOfficeMusic(musicOn); }, [musicOn]);
-  useEffect(() => () => setOfficeMusic(false), []);
+  // 장면별 음악: 대기실 → 근무 중 → 퇴근 뒤(가장 많이 잃은 사람은 따로). 방 밖에서는 끈다.
+  // 방금 퇴근했으면 퇴근 종·팡파르·직원상 소리가 끝난 뒤 정산 음악을 켠다.
+  const biggestLoser = Boolean(result?.awards?.find(award => award.award === 'biggestLoss')?.players.includes(result.you));
+  const scene = !room || !connected ? null
+    : result ? (biggestLoser ? 'loser' : 'result')
+    : room.room.startedAt ? 'office'
+    : startingSolo ? null : 'lobby';
+  const sceneDelay = scene === 'result' || scene === 'loser' ? (result?.fresh ? 4.5 : 0) : 0;
+  useEffect(() => { setMusic(scene, { delay: sceneDelay }); }, [scene, sceneDelay]);
+  useEffect(() => () => setMusic(null), []);
   const bossWalking = Boolean(market?.walking);
   useEffect(() => { duckMusic(bossWalking); }, [bossWalking]);
   // 버튼을 누르면 작은 클릭음. 브라우저는 사용자가 누른 뒤에야 소리를 허락하므로 이때 소리도 켠다.
