@@ -125,8 +125,7 @@ export function AccountEntry({ account, notice, actionErrors, connected, send })
       {tabs.map(item => {
         const active = tab === item.id;
         return <form key={item.id} id={ids + '-' + item.id} aria-hidden={!active} inert={!active}
-          className={'col-start-1 row-start-1 flex flex-col gap-3 ' + (item.id === 'GUEST' ? 'justify-between ' : '') +
-            (active ? '' : 'invisible')}
+          className={'col-start-1 row-start-1 flex flex-col gap-3 ' + (active ? '' : 'invisible')}
           onSubmit={event => onSubmit(event, item.id)}>
           {item.id === 'LOGIN' && <>
             <NameField id={ids + '-login-name'} label="이름" autoComplete="username" disabled={pending} />
@@ -147,9 +146,10 @@ export function AccountEntry({ account, notice, actionErrors, connected, send })
           {item.id === 'GUEST' && <>
             <NameField id={ids + '-guest-name'} label="닉네임" autoComplete="nickname" disabled={pending}
               placeholder="한글·영문·숫자 2~10자" />
-            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-950 dark:bg-amber-950 dark:text-amber-100">
-              게스트는 판 결과와 꾸미기가 저장되지 않고 명예의 전당에도 오르지 않아요.
-              기록을 남기려면 <button type="button" className="font-semibold underline" onClick={() => setTab('SIGNUP')}>회원가입</button>하세요.
+            {/* 낱말 중간에서 줄이 바뀌지 않게(break-keep) 두 줄로 나눠 쓴다. */}
+            <p className="space-y-0.5 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed break-keep text-amber-950 dark:bg-amber-950 dark:text-amber-100">
+              <span className="block">게스트 기록은 저장되지 않고 명예의 전당에도 오르지 않아요.</span>
+              <span className="block">기록을 남기려면 <button type="button" className="font-semibold underline" onClick={() => setTab('SIGNUP')}>회원가입</button>하세요.</span>
             </p>
           </>}
         </form>;
