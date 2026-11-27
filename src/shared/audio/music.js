@@ -1,15 +1,16 @@
 // 장면별 배경음악. 한 번에 한 곡만 흐르고, 장면이 바뀌면 앞 곡은 서서히 꺼지고 새 곡이 서서히 켜진다.
-// 곡마다 두 벌을 번갈아 틀며 끝나기 4초 전부터 다음 벌과 겹쳐(크로스페이드) 이음매 없이 반복한다.
-// 근무 중에는 부장님이 걷는 동안 발소리가 묻히지 않게 소리를 줄인다.
+// 근무 중 음악은 두 벌을 번갈아 틀며 끝나기 4초 전부터 겹쳐(크로스페이드) 이음매 없이 반복하고,
+// 부장님이 걷는 동안 발소리가 묻히지 않게 소리를 줄인다. 대기실 음악은 끝나면 처음부터 다시, 퇴근 음악은 한 번만 튼다.
+// 음량은 근무 중 음악(music)과 대기실·퇴근 음악(breakMusic)을 따로 조절한다.
 import { musicInput } from './spatial-audio.js';
 
 const base = `${import.meta.env.BASE_URL}sounds/`;
 /** 장면 → 곡. 출처는 public/sounds/CREDITS.md. */
 const TRACKS = {
-  lobby: base + 'music-lobby.m4a',     // Silent Partner - Dog Park: 대기실
-  office: base + 'office-music.m4a',   // 사무실 음악(14:00~18:00): 근무 중
-  result: base + 'music-result.m4a',   // Kevin MacLeod - Hyperfun: 퇴근 뒤
-  loser: base + 'music-loser.m4a',     // Reed Mathis - Here Come The Raindrops: 퇴근 뒤 가장 많이 잃은 사람
+  lobby: { src: base + 'music-lobby.m4a', channel: 'breakMusic', play: 'loop' },        // Silent Partner - Dog Park
+  office: { src: base + 'office-music.m4a', channel: 'music', play: 'crossfade' },      // 사무실 음악(14:00~18:00)
+  result: { src: base + 'music-result.m4a', channel: 'breakMusic', play: 'once' },      // Kevin MacLeod - Hyperfun
+  loser: { src: base + 'music-loser.m4a', channel: 'breakMusic', play: 'once' },        // Reed Mathis - Here Come The Raindrops
 };
 const CROSSFADE = 4;      // 초
 const FADE_IN = 2.5, FADE_OUT = 1.5;
@@ -22,14 +23,14 @@ function fade(context, param, value, seconds) {
   param.linearRampToValueAtTime(value, t + seconds);
 }
 
-/** 곡 하나를 두 벌로 반복 재생한다. */
-function createTrack(src) {
-  const { context, input } = musicInput();
+/** 곡 하나. play: 'crossfade'(두 벌 겹쳐 반복), 'loop'(끝나면 처음부터), 'once'(한 번만). */
+function createTrack({ src, channel, play }) {
+  const { context, input } = musicInput(channel);
   const level = new GainNode(context, { gain: 0 });    // 켜기·끄기 페이드
   const duck = new GainNode(context, { gain: 1 });     // 부장님 걸을 때 줄이기
   level.connect(duck).connect(input);
-  const decks = [0, 1].map(() => {
-    const element = Object.assign(new Audio(src), { preload: 'auto' });
+  const decks = (play === 'crossfade' ? [0, 1] : [0]).map(() => {
+    const element = Object.assign(new Audio(src), { preload: 'auto', loop: play === 'loop' });
     const gain = new GainNode(context, { gain: 0 });
     context.createMediaElementSource(element).connect(gain).connect(level);
     return { element, gain };
@@ -52,6 +53,7 @@ function createTrack(src) {
       context.resume().catch(() => {});
       startDeck(current, 0.01);
       fade(context, level.gain, 1, FADE_IN);
+      if (play !== 'crossfade') return;
       timer = setInterval(() => {
         const { element, gain } = decks[current];
         if (!element.duration || element.duration - element.currentTime > CROSSFADE) return;
