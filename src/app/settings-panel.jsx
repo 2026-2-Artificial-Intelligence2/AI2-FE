@@ -5,7 +5,8 @@ import { Icon, faGear, faMoon, faSun, faVolumeHigh, faVolumeXmark } from '../sha
 
 const channels = [
   { id: 'master', label: '전체 음량', hint: '모든 소리' },
-  { id: 'music', label: '배경음악', hint: '대기실·근무·퇴근 음악' },
+  { id: 'music', label: '근무 음악', hint: '근무 중 사무실 음악' },
+  { id: 'breakMusic', label: '대기실·퇴근 음악', hint: '근무 밖 음악' },
   { id: 'effects', label: '효과음', hint: '체결·알림·업무·정산' },
   { id: 'boss', label: '부장님 소리', hint: '발소리·헛기침·문 소리' },
   { id: 'voice', label: '음성 채팅', hint: '동료 목소리 전체' },
@@ -104,9 +105,9 @@ export function SettingsPanel({ theme, onToggleTheme }) {
       <details className="border-t border-ui-border pt-3 text-xs text-ui-secondary">
         <summary className="cursor-pointer font-semibold">음악 출처</summary>
         <ul className="mt-2 space-y-1.5 leading-relaxed">
-          <li>대기실: Silent Partner – Dog Park</li>
-          <li>퇴근 뒤 가장 많이 잃은 사람: Reed Mathis – Here Come The Raindrops</li>
-          <li>퇴근 뒤: "Hyperfun" Kevin MacLeod (incompetech.com),{' '}
+          <li>Silent Partner – Dog Park</li>
+          <li>Reed Mathis – Here Come The Raindrops</li>
+          <li>"Hyperfun" Kevin MacLeod (incompetech.com),{' '}
             <a className="underline" href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a></li>
         </ul>
       </details>
