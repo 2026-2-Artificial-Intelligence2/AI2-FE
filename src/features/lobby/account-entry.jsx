@@ -25,21 +25,19 @@ function useRequest({ account, actionErrors, connected, send }) {
   return { pending, submit, error: verb => actionErrors[verb]?.message };
 }
 
-function PasswordField({ id, label, autoComplete, disabled, hint }) {
-  const [shown, setShown] = useState(false);
-  return <div className="space-y-1">
+function PasswordField({ id, label, autoComplete, disabled, shown, name = 'password' }) {
+  return <div className="min-w-0 space-y-1">
     <label htmlFor={id} className="text-xs font-semibold text-ui-secondary">{label}</label>
-    <div className="flex gap-1.5">
-      <input id={id} name={id.endsWith('confirm') ? 'confirm' : 'password'} type={shown ? 'text' : 'password'}
-        className="field min-w-0 flex-1" autoComplete={autoComplete} minLength={6} maxLength={64}
-        disabled={disabled} required />
-      <button type="button" className="control shrink-0 px-2.5 text-xs" aria-pressed={shown}
-        aria-label={shown ? '비밀번호 숨기기' : '비밀번호 보기'} onClick={() => setShown(value => !value)}>
-        {shown ? '숨기기' : '보기'}
-      </button>
-    </div>
-    {hint && <p className="text-[11px] text-ui-caption">{hint}</p>}
+    <input id={id} name={name} type={shown ? 'text' : 'password'} className="field w-full"
+      autoComplete={autoComplete} minLength={6} maxLength={64} disabled={disabled} required />
   </div>;
+}
+
+function ShowPassword({ shown, onChange }) {
+  return <label className="flex items-center gap-1.5 text-xs text-ui-secondary">
+    <input type="checkbox" checked={shown} onChange={event => onChange(event.target.checked)} />
+    비밀번호 보기
+  </label>;
 }
 
 function NameField({ id, label, autoComplete, disabled, hint }) {
@@ -56,26 +54,27 @@ export function AccountEntry({ account, notice, actionErrors, connected, send })
   const [tab, setTab] = useState('LOGIN');
   const [switching, setSwitching] = useState(false);
   const [mismatch, setMismatch] = useState('');
+  const [shown, setShown] = useState(false);
   const { pending, submit, error } = useRequest({ account, actionErrors, connected, send });
 
   // 로그인·가입·게스트가 되면 입력 화면을 닫는다.
   useEffect(() => { setSwitching(false); setMismatch(''); }, [account?.name, account?.member]);
 
-  function onSubmit(event) {
+  function onSubmit(event, verb) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     const name = String(data.get('name') ?? '').trim();
-    if (tab === 'GUEST') {
+    if (verb === 'GUEST') {
       submit('GUEST', ' ' + name);
       return;
     }
     const password = String(data.get('password') ?? '');
-    if (tab === 'SIGNUP' && password !== data.get('confirm')) {
+    if (verb === 'SIGNUP' && password !== data.get('confirm')) {
       setMismatch('비밀번호 확인이 일치하지 않아요.');
       return;
     }
     setMismatch('');
-    submit(tab, ' ' + name + ' ' + password);
+    submit(verb, ' ' + name + ' ' + password);
   }
 
   if (account && !switching) {
@@ -108,7 +107,6 @@ export function AccountEntry({ account, notice, actionErrors, connected, send })
     </section>;
   }
 
-  const formError = mismatch || error(tab);
   return <section aria-labelledby={ids + '-title'} className="rounded-xl border border-ui-border p-4">
     <div className="mb-3 flex items-center justify-between gap-2">
       <h3 id={ids + '-title'} className="text-sm font-bold">누구로 출근할까요?</h3>
@@ -121,34 +119,51 @@ export function AccountEntry({ account, notice, actionErrors, connected, send })
         onClick={() => { setTab(item.id); setMismatch(''); }}>{item.label}</button>)}
     </div>
 
-    <form key={tab} className="mt-3 space-y-3" onSubmit={onSubmit} noValidate={false}>
-      {tab === 'LOGIN' && <>
-        <NameField id={ids + '-login-name'} label="이름" autoComplete="username" disabled={pending} />
-        <PasswordField id={ids + '-login-password'} label="비밀번호" autoComplete="current-password" disabled={pending} />
-      </>}
-      {tab === 'SIGNUP' && <>
-        <NameField id={ids + '-signup-name'} label="이름" autoComplete="username" disabled={pending}
-          hint="한글·영문·숫자 2~10자. 방과 명예의 전당에 이 이름이 보여요." />
-        <PasswordField id={ids + '-signup-password'} label="비밀번호" autoComplete="new-password" disabled={pending}
-          hint="6자 이상. 다른 기기에서 로그인할 때 써요." />
-        <PasswordField id={ids + '-signup-confirm'} label="비밀번호 확인" autoComplete="new-password" disabled={pending} />
-      </>}
-      {tab === 'GUEST' && <>
-        <NameField id={ids + '-guest-name'} label="닉네임" autoComplete="nickname" disabled={pending} />
-        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-950 dark:bg-amber-950 dark:text-amber-100">
-          게스트는 판 결과와 꾸미기가 저장되지 않고 명예의 전당에도 오르지 않아요.
-        </p>
-      </>}
-      {formError && <p role="alert" className="text-xs text-rose-700 dark:text-rose-300">{formError}</p>}
-      {!formError && notice && !account && <p role="status" className="text-xs text-ui-secondary">{notice}</p>}
-      <button type="submit" className="primary-action w-full rounded-lg px-4 py-2.5 text-sm font-bold"
-        disabled={!connected || pending}>
-        {pending ? '확인 중…' : tab === 'LOGIN' ? '로그인' : tab === 'SIGNUP' ? '가입하고 시작하기' : '게스트로 시작하기'}
-      </button>
-      {tab === 'LOGIN' && <p className="text-center text-xs text-ui-secondary">
-        처음이라면 <button type="button" className="font-semibold text-ui-text underline" onClick={() => setTab('SIGNUP')}>회원가입</button>
-        {' '}또는 <button type="button" className="font-semibold text-ui-text underline" onClick={() => setTab('GUEST')}>게스트로 시작</button>
-      </p>}
-    </form>
+    {/* 세 입력 화면을 같은 칸에 겹쳐 두고 보이는 것만 바꾼다. 칸 높이가 가장 큰 화면(회원가입)에 맞춰져
+        탭을 바꿔도 카드 크기가 그대로다. */}
+    <div className="mt-3 grid">
+      {tabs.map(item => {
+        const active = tab === item.id;
+        const message = active ? (mismatch || error(item.id) || (!account && notice) || '') : '';
+        const isError = active && Boolean(mismatch || error(item.id));
+        return <form key={item.id} aria-hidden={!active} inert={!active}
+          className={'col-start-1 row-start-1 flex flex-col gap-3 ' + (active ? '' : 'invisible')}
+          onSubmit={event => onSubmit(event, item.id)}>
+          {item.id === 'LOGIN' && <>
+            <NameField id={ids + '-login-name'} label="이름" autoComplete="username" disabled={pending} />
+            <PasswordField id={ids + '-login-password'} label="비밀번호" autoComplete="current-password" disabled={pending} shown={shown} />
+            <ShowPassword shown={shown} onChange={setShown} />
+          </>}
+          {item.id === 'SIGNUP' && <>
+            <NameField id={ids + '-signup-name'} label="이름" autoComplete="username" disabled={pending}
+              hint="한글·영문·숫자 2~10자 · 방과 명예의 전당에 보여요" />
+            <div className="grid grid-cols-2 gap-2">
+              <PasswordField id={ids + '-signup-password'} label="비밀번호 (6자 이상)" autoComplete="new-password" disabled={pending} shown={shown} />
+              <PasswordField id={ids + '-signup-confirm'} name="confirm" label="비밀번호 확인" autoComplete="new-password" disabled={pending} shown={shown} />
+            </div>
+            <ShowPassword shown={shown} onChange={setShown} />
+          </>}
+          {item.id === 'GUEST' && <>
+            <NameField id={ids + '-guest-name'} label="닉네임" autoComplete="nickname" disabled={pending} />
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-950 dark:bg-amber-950 dark:text-amber-100">
+              게스트는 판 결과와 꾸미기가 저장되지 않고 명예의 전당에도 오르지 않아요.
+            </p>
+          </>}
+          {/* 안내·오류 자리를 미리 잡아 두어 문구가 생겨도 높이가 바뀌지 않게 한다. */}
+          <p role={isError ? 'alert' : 'status'} className={'min-h-4 text-xs leading-4 ' +
+            (isError ? 'text-rose-700 dark:text-rose-300' : 'text-ui-secondary')}>{message}</p>
+          <div className="mt-auto space-y-3">
+            <button type="submit" className="primary-action w-full rounded-lg px-4 py-2.5 text-sm font-bold"
+              disabled={!connected || pending}>
+              {pending && active ? '확인 중…' : item.id === 'LOGIN' ? '로그인' : item.id === 'SIGNUP' ? '가입하고 시작하기' : '게스트로 시작하기'}
+            </button>
+            {item.id === 'LOGIN' && <p className="text-center text-xs text-ui-secondary">
+              처음이라면 <button type="button" className="font-semibold text-ui-text underline" onClick={() => setTab('SIGNUP')}>회원가입</button>
+              {' '}또는 <button type="button" className="font-semibold text-ui-text underline" onClick={() => setTab('GUEST')}>게스트로 시작</button>
+            </p>}
+          </div>
+        </form>;
+      })}
+    </div>
   </section>;
 }

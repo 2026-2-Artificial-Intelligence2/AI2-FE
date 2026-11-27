@@ -2,23 +2,33 @@
   display: grid;
   gap: 1rem;
   inline-size: 100%;
-  max-inline-size: 70rem;
+  max-inline-size: 72rem;
   margin-inline: auto;
   margin-block-start: clamp(0.75rem, 3vh, 2rem);
+  grid-template-areas: 'visual' 'controls' 'board';
 }
 
-.entry-card {
-  display: grid;
-  inline-size: 100%;
+.entry-visual {
+  grid-area: visual;
   overflow: hidden;
 }
 
+/* 사진은 원래 비율 그대로 다 보인다(잘리거나 늘어나지 않음). */
 .entry-illustration {
   display: block;
   inline-size: 100%;
-  block-size: 100%;
+  block-size: auto;
   aspect-ratio: 1672 / 941;
-  object-fit: cover;
+}
+
+.entry-card {
+  grid-area: controls;
+  min-inline-size: 0;
+}
+
+.entry-page > .leaderboard-panel {
+  grid-area: board;
+  align-self: stretch;
 }
 
 .entry-controls {
@@ -60,8 +70,15 @@
 }
 
 @media (min-width: 52rem) {
-  .entry-card {
+  .entry-page {
     grid-template-columns: minmax(0, 1.5fr) minmax(21rem, 1fr);
+    grid-template-rows: auto 1fr;
+    grid-template-areas: 'visual controls' 'board controls';
+    align-items: start;
+  }
+
+  .entry-card {
+    align-self: stretch;
   }
 }
 
