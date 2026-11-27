@@ -1,20 +1,19 @@
 import * as THREE from 'three';
 
-// Painted-plaster finish for the office walls plus soft shading where walls meet the floor,
+// Painted-plaster finish for the office walls, a tiled floor, and soft shading where walls meet the floor,
 // the ceiling and each other, so flat boxes read as real painted walls.
 
 // Wall boxes are recognised by their paint colours (window walls, east wall, west wall).
 const WALL_COLORS = new Set([0xeadccb, 0xe7d8c6, 0xd2d9d2]);
 const TILE = 1.6;   // metres of wall covered by one repeat of the plaster texture
 
-function plasterTextures() {
-  const size = 256;
+// Tileable value noise summed over [cells, amount, seed] layers, as a size x size height field.
+function noiseField(size, layers) {
   const height = new Float32Array(size * size);
-  // Tileable value noise at a few scales: broad trowel mottling plus fine grain.
-  const layer = (cells, amount, seed) => {
+  for (const [cells, amount, seed] of layers) {
     const grid = [];
-    for (let i = 0; i < cells * cells; i++) grid.push(Math.sin((i + 1) * 12.9898 * seed) * 43758.5453 % 1);
-    const at = (x, y) => Math.abs(grid[((y % cells) * cells) + (x % cells)]);
+    for (let i = 0; i < cells * cells; i++) grid.push(Math.abs(Math.sin((i + 1) * 12.9898 * seed) * 43758.5453 % 1));
+    const at = (x, y) => grid[((y % cells) * cells) + (x % cells)];
     for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
       const fx = x / size * cells, fy = y / size * cells;
       const x0 = Math.floor(fx), y0 = Math.floor(fy);
@@ -24,23 +23,24 @@ function plasterTextures() {
       const bottom = at(x0, y0 + 1) + (at(x0 + 1, y0 + 1) - at(x0, y0 + 1)) * ex;
       height[y * size + x] += (top + (bottom - top) * ey) * amount;
     }
-  };
-  layer(4, 0.5, 1.7);
-  layer(16, 0.3, 2.3);
-  layer(64, 0.2, 3.1);
+  }
+  return height;
+}
 
+// Colour (grey, tinted by the material colour) and normal map textures from per-pixel callbacks.
+function surfaceTextures(size, shadeAt, heightAt, strength) {
   const color = document.createElement('canvas');
   const normal = document.createElement('canvas');
   color.width = color.height = normal.width = normal.height = size;
   const colorData = color.getContext('2d').createImageData(size, size);
   const normalData = normal.getContext('2d').createImageData(size, size);
-  const h = (x, y) => height[((y + size) % size) * size + ((x + size) % size)];
+  const h = (x, y) => heightAt((x + size) % size, (y + size) % size);
+  const n = new THREE.Vector3();
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
     const i = (y * size + x) * 4;
-    const shade = 240 + h(x, y) * 15;                  // near white; the material colour tints it
+    const shade = shadeAt(x, y);
     colorData.data.set([shade, shade, shade, 255], i);
-    const dx = (h(x + 1, y) - h(x - 1, y)) * 2.2, dy = (h(x, y + 1) - h(x, y - 1)) * 2.2;
-    const n = new THREE.Vector3(-dx, -dy, 1).normalize();
+    n.set(-(h(x + 1, y) - h(x - 1, y)) * strength, -(h(x, y + 1) - h(x, y - 1)) * strength, 1).normalize();
     normalData.data.set([(n.x * 0.5 + 0.5) * 255, (n.y * 0.5 + 0.5) * 255, (n.z * 0.5 + 0.5) * 255, 255], i);
   }
   color.getContext('2d').putImageData(colorData, 0, 0);
@@ -50,9 +50,48 @@ function plasterTextures() {
   const normalMap = new THREE.CanvasTexture(normal);
   for (const texture of [map, normalMap]) {
     texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-    texture.anisotropy = 4;
+    texture.anisotropy = 8;
   }
   return { map, normalMap };
+}
+
+function plasterTextures() {
+  // Broad trowel mottling plus fine grain.
+  const size = 256;
+  const height = noiseField(size, [[4, 0.5, 1.7], [16, 0.3, 2.3], [64, 0.2, 3.1]]);
+  const at = (x, y) => height[y * size + x];
+  return surfaceTextures(size, (x, y) => 240 + at(x, y) * 15, at, 2.2);   // near white; the paint colour tints it
+}
+
+// Matte stone-look floor tiles: each tile a slightly different tone, cloudy mottling, fine grit
+// and recessed grout lines.
+const FLOOR_TILE = 0.6;      // metres per tile
+const FLOOR_TILES = 4;       // tiles across one texture repeat
+function floorTextures() {
+  const size = 512, tile = size / FLOOR_TILES, grout = 2;
+  const cloud = noiseField(size, [[6, 0.6, 4.1], [24, 0.4, 5.3]]);
+  const grit = noiseField(size, [[128, 1, 6.7]]);
+  const toneOf = (tx, ty) => Math.abs(Math.sin((tx * 7 + ty * 13 + 1) * 91.7) * 1e4 % 1) - 0.5;
+  const isGrout = (x, y) => x % tile < grout || y % tile < grout;
+  const shadeAt = (x, y) => {
+    if (isGrout(x, y)) return 214;
+    const i = y * size + x;
+    return 236 + toneOf(Math.floor(x / tile), Math.floor(y / tile)) * 12 + (cloud[i] - 0.5) * 16 + (grit[i] - 0.5) * 7;
+  };
+  const heightAt = (x, y) => (isGrout(x, y) ? -0.45 : 0) + grit[y * size + x] * 0.25 + cloud[y * size + x] * 0.15;
+  return surfaceTextures(size, shadeAt, heightAt, 1.6);
+}
+
+// Replaces a floor box's flat paint with the tiled floor, tiled to its size; returns a cleanup.
+export function finishFloor(floor) {
+  const { map, normalMap } = floorTextures();
+  const span = FLOOR_TILE * FLOOR_TILES;
+  for (const texture of [map, normalMap]) texture.repeat.set(floor.scale.x / span, floor.scale.z / span);
+  const material = new THREE.MeshStandardMaterial({
+    color: floor.material.color, map, normalMap, normalScale: new THREE.Vector2(0.6, 0.6), roughness: 0.78,
+  });
+  floor.material = material;
+  return () => { map.dispose(); normalMap.dispose(); material.dispose(); };
 }
 
 // Black fading to clear along +V: the soft shadow in a corner.
