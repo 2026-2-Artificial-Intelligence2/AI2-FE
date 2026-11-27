@@ -24,7 +24,7 @@ import { KeyHint, useShortcuts } from '../shared/ui/shortcuts.jsx';
 const headerControl = 'control min-h-11 shrink-0 whitespace-nowrap px-2.5 sm:min-h-0 sm:px-3';
 
 export function App() {
-  const { game, send, office, dismissNews, voiceSignals } = useGame();
+  const { game, send, office, dismissNews, dismissRecoveryCode, voiceSignals } = useGame();
   const { theme, toggleTheme } = useTheme();
   const [inbox, setInbox] = useState(false);
   const [activeDialog, setActiveDialog] = useState(null);
@@ -248,7 +248,8 @@ export function App() {
           </div>}
         {(!room || startingSolo) && <Entry connected={connected && !startingSolo} send={send} status={game.status}
           account={game.account} accountNotice={game.accountNotice} actionErrors={actionErrors} startingSolo={startingSolo}
-          leaderboard={game.leaderboard} />}
+          leaderboard={game.leaderboard} records={game.records} recoveryCode={game.recoveryCode} gameNotice={game.notice}
+          dismissRecoveryCode={dismissRecoveryCode} />}
         {inLobby && <Lobby key={'lobby-' + room.code + '-' + room.round} game={game} host={host} send={send}
           messenger={messenger} />}
         {desk && !result && <Work game={game} visible={desktopView === 'WORK'} active={desktopInteractive && view === 'WORK' && !messengerOpen} gauges={gauges} loanAction={loanAction} send={send} />}

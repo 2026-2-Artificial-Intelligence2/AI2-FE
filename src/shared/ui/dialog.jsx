@@ -1,6 +1,6 @@
 import React, { useLayoutEffect, useRef } from 'react';
 
-export function Dialog({ id, title, pending, onDismiss, children }) {
+export function Dialog({ id, title, pending, onDismiss, children, width = '28rem' }) {
   const dialog = useRef(null);
   const dismiss = useRef(null);
 
@@ -12,7 +12,8 @@ export function Dialog({ id, title, pending, onDismiss, children }) {
   }, []);
 
   return <dialog ref={dialog} id={id} aria-labelledby={id + '-title'}
-    className="panel fixed inset-0 m-auto max-h-[calc(100dvh-2rem)] w-[min(28rem,calc(100vw-2rem))] overflow-y-auto p-0 text-ui-text shadow-2xl backdrop:bg-slate-950/45"
+    style={{ inlineSize: `min(${width}, calc(100vw - 2rem))` }}
+    className="panel fixed inset-0 m-auto max-h-[calc(100dvh-2rem)] overflow-y-auto p-0 text-ui-text shadow-2xl backdrop:bg-slate-950/45"
     onCancel={event => {
       event.preventDefault();
       if (!pending) onDismiss();
