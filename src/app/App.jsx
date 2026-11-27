@@ -3,6 +3,7 @@ import { useGame } from './use-game.js';
 import { useTheme } from './use-theme.js';
 import { useVoice } from './use-voice.js';
 import { VoicePanel } from './voice-panel.jsx';
+import { SettingsPanel } from './settings-panel.jsx';
 import { GameGauges } from './game-gauges.jsx';
 import { enableSound, sfx } from '../shared/audio/spatial-audio.js';
 import { clock } from '../shared/format.js';
@@ -201,11 +202,7 @@ export function App() {
         <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 border-b border-ui-border pb-4 sm:flex sm:flex-wrap">
           <h1 className="text-lg font-extrabold tracking-tight">부장님 몰래</h1>
           <div className="flex items-center gap-2 text-sm sm:ml-auto">
-            <button type="button" className="control grid size-11 place-items-center p-0 text-base sm:block sm:size-auto sm:px-3 sm:py-1.5 sm:text-sm"
-              aria-label="다크 모드" aria-pressed={theme === 'dark'} onClick={toggleTheme}>
-              <span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span>
-              <span aria-hidden="true" className="hidden sm:inline">{theme === 'dark' ? ' 라이트 모드' : ' 다크 모드'}</span>
-            </button>
+            <SettingsPanel theme={theme} onToggleTheme={toggleTheme} />
             {room && !solo && <VoicePanel voice={voice} connected={connected} serverError={actionErrors.VOICE?.message} />}
           </div>
           {room && !startingSolo && <div className="col-span-full flex min-w-0 items-center gap-1.5 text-sm sm:flex-wrap sm:gap-2">

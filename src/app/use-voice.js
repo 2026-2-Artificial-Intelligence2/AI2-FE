@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { finalLevel, soundSettings, subscribeSound } from '../shared/sound-settings.js';
+
+/** 사람별 음량 × 설정의 음성 채팅·전체 음량. */
+const voiceVolume = personal => personal * finalLevel(soundSettings(), 'voice');
 
 // 음성 대화(WebRTC). 음성은 브라우저끼리 직접 주고받고, 서버는 연결 정보(offer·answer·ICE 후보)만 전달한다.
 // 같은 방에서 음성에 참여한 사람과 한 명씩 연결한다(메시). 두 사람 중 이름이 사전순으로 앞서는 쪽이 연결을 제안해
@@ -84,7 +88,7 @@ export function useVoice({ game, send, signals }) {
     if (!peer || peer.audio || !local.current) return;
     const audio = Object.assign(document.createElement('audio'), { autoplay: true, playsInline: true, srcObject: stream });
     audio.setAttribute('playsinline', '');
-    audio.volume = volumes.current.get(label) ?? 1;
+    audio.volume = voiceVolume(volumes.current.get(label) ?? 1);
     audio.dataset.voicePeer = label;
     document.body.append(audio);
     peer.audio = audio;
@@ -231,9 +235,16 @@ export function useVoice({ game, send, signals }) {
   function setVolume(label, value) {
     volumes.current.set(label, value);
     const audio = peers.current.get(label)?.audio;
-    if (audio) audio.volume = value;
+    if (audio) audio.volume = voiceVolume(value);
     refresh();
   }
+
+  // 설정에서 음성 채팅·전체 음량을 바꾸면 모든 사람에게 바로 적용한다.
+  useEffect(() => subscribeSound(() => {
+    for (const [label, peer] of peers.current) {
+      if (peer.audio) peer.audio.volume = voiceVolume(volumes.current.get(label) ?? 1);
+    }
+  }), []);
 
   // 서버가 보낸 연결 정보 처리
   useEffect(() => {
