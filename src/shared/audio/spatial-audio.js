@@ -153,11 +153,26 @@ function spatial({ x, z, y = -1, at = 0 }, listener) {
   return muffle;
 }
 
+/** 순찰 한 박자(2초)에 걷는 걸음 수와 간격. */
+const STEPS_PER_BEAT = 4, STEP_SECONDS = 0.5;
+/** 마지막으로 예약한 발걸음 시각(AudioContext 기준). 다음 박자를 이 뒤에 이어 붙인다. */
+let lastStepAt = 0;
+
+/**
+ * 한 박자 동안 from→to 구간을 걷는 발소리. 걸음은 구간의 25·50·75·100% 지점에서 나므로
+ * 박자가 끝날 때 소리가 부장님이 실제로 선 자리에 닿는다(예전엔 0~75%만 내서 끝에서 위치가 튀었다).
+ * 시세 메시지가 조금 일찍·늦게 와도 걸음 간격이 고르도록, 앞 박자의 마지막 걸음 뒤에 이어 붙인다.
+ */
 export function footsteps({ from, to, listener }) {
   if (!ready()) return;
   const step = buffers.get('boss-footstep');
-  for (const delay of [0, 0.5, 1, 1.5]) {
-    const fraction = delay / 2;
+  const now = audio.currentTime;
+  // 앞 박자가 아직 끝나지 않았으면(메시지가 일찍 옴) 그 뒤에 잇고, 이미 지났으면(늦게 옴·새로 걷기 시작) 지금부터.
+  const start = lastStepAt > now && lastStepAt - now < STEP_SECONDS * 2 ? lastStepAt : now;
+  lastStepAt = start + STEPS_PER_BEAT * STEP_SECONDS;
+  for (let i = 1; i <= STEPS_PER_BEAT; i++) {
+    const delay = start - now + i * STEP_SECONDS;
+    const fraction = i / STEPS_PER_BEAT;
     const x = from.x + (to.x - from.x) * fraction - listener.position.x;
     const z = from.z + (to.z - from.z) * fraction - listener.position.z;
     const pan = spatial({ x, z, at: delay }, listener);

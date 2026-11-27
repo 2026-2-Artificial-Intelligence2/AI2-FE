@@ -49,11 +49,17 @@
   gap: 0.75rem;
 }
 
+/* 대기실 왼쪽 칸. 자리·설정을 나란히 둘지는 창 너비가 아니라 이 칸의 너비로 정한다
+   (넓은 창에서는 메신저가 오른쪽을 차지해 왼쪽 칸이 오히려 좁아진다). */
+.lobby-main {
+  container: lobby-main / inline-size;
+}
+
 .lobby-messenger {
   block-size: 27rem;
 }
 
-@media (min-width: 45rem) {
+@container lobby-main (min-width: 40rem) {
   .lobby-grid {
     grid-template-columns: minmax(0, 1fr) minmax(15rem, 19rem);
   }

@@ -178,7 +178,7 @@ function InviteCode({ code }) {
 
 function Players({ members, you }) {
   return (
-    <section className='panel lobby-players flex min-w-0 flex-col p-5' aria-labelledby='players-title'>
+    <section className='panel lobby-players @container flex min-w-0 flex-col p-5' aria-labelledby='players-title'>
       <header className='mb-4 flex shrink-0 items-center justify-between gap-2'>
         <h3 id='players-title' className='font-bold'>
           참가자 자리
@@ -187,7 +187,8 @@ function Players({ members, you }) {
           {members.length} / {seats}명
         </p>
       </header>
-      <ul className='grid min-h-0 content-start gap-2 overflow-y-auto sm:grid-cols-2'>
+      {/* 칸 수는 창 너비가 아니라 이 칸의 너비로 정한다(메신저·설정과 나란히 놓이면 좁아진다). */}
+      <ul className='grid min-h-0 content-start gap-2 overflow-y-auto @md:grid-cols-2'>
         {Array.from({ length: seats }, (_, index) => {
           const member = members[index];
           const mine = member?.label === you;
@@ -208,9 +209,9 @@ function Players({ members, you }) {
                 {Array.from(member?.label?.normalize('NFC').trim() ?? '')[0] ?? '+'}
               </span>
               {member ? (
-                <div>
-                  <div className='flex flex-wrap items-center gap-x-2'>
-                    <span className='text-sm font-bold'>
+                <div className='min-w-0'>
+                  <div className='flex flex-wrap items-center gap-x-2 gap-y-1'>
+                    <span className='min-w-0 text-sm font-bold break-keep [overflow-wrap:anywhere]'>
                       {member.label}
                       {mine && ' (나)'}
                     </span>
@@ -323,7 +324,7 @@ export function Lobby({ game, host, send, messenger }) {
   const { room, connected, status, actionErrors } = game;
   return (
     <section id='lobby' className={room.solo ? 'mx-auto max-w-2xl' : 'lobby-shell min-w-0'} aria-labelledby='lobby-title'>
-      <div className='min-w-0 space-y-3'>
+      <div className='lobby-main min-w-0 space-y-3'>
         <header className='panel bg-ui-muted flex flex-wrap items-center justify-between gap-5 p-5 sm:px-7'>
           <div>
             <h2 id='lobby-title' className='text-xl font-extrabold'>
