@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { footsteps, cough } from '../shared/audio/spatial-audio.js';
 import { STAFF, staffAtSeat } from '../shared/scene/office-seats.js';
+import { createSoundCues } from './game-sounds.js';
 
 const seatKey = 'officeStockSeat';
 const loginKey = 'officeStockLogin';
@@ -216,6 +217,7 @@ export function useGame() {
     let roomStartedAt;
     let roundSeconds;
     let youLabel;
+    const sounds = createSoundCues();
 
     function connect() {
       requestIds.current = false;
@@ -231,6 +233,7 @@ export function useGame() {
         }));
       }
       connection.onopen = () => {
+        sounds.reset();
         if (stopped) return;
         const token = readLoginToken();
         if (!token) {
@@ -368,6 +371,7 @@ export function useGame() {
           }
         }
 
+        message = sounds.cue(message, { popup, you: youLabel });
         setGame(game => {
           const next = reduce(game, message, receivedAt);
           return popup ? { ...next, popup } : next;

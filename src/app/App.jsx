@@ -4,7 +4,7 @@ import { useTheme } from './use-theme.js';
 import { useVoice } from './use-voice.js';
 import { VoicePanel } from './voice-panel.jsx';
 import { GameGauges } from './game-gauges.jsx';
-import { enableSound } from '../shared/audio/spatial-audio.js';
+import { enableSound, sfx } from '../shared/audio/spatial-audio.js';
 import { clock } from '../shared/format.js';
 import { Market } from '../features/market/market.jsx';
 import { Work } from '../features/work/work.jsx';
@@ -40,6 +40,16 @@ export function App() {
   useEffect(() => {
     if (import.meta.env.DEV) window.officeVoice = voice;
   });
+  // 버튼을 누르면 작은 클릭음. 브라우저는 사용자가 누른 뒤에야 소리를 허락하므로 이때 소리도 켠다.
+  useEffect(() => {
+    const onClick = event => {
+      if (!event.target.closest?.('button:not(:disabled)')) return;
+      enableSound();
+      sfx.click();
+    };
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
+  }, []);
   const seated = view === 'WORK' || view === 'MARKET';
   const messaging = view === 'MESSENGER';
   const computer = seated || messaging;
