@@ -148,3 +148,15 @@
   .notification-preview--chat { border-left-color: var(--preview-chat); }
   button.notification-preview:hover { background: var(--preview-hover); }
 }
+
+/* 부장님 발소리 표시: 멀면 기본, 가까우면 노랑, 바로 근처면 빨강. */
+.boss-nearby { background: var(--color-ui-surface); color: var(--color-ui-text); border: 1px solid var(--color-ui-border); transition: background-color .3s, color .3s; }
+.boss-nearby-arrow { background: var(--color-ui-muted, #eee); }
+.boss-nearby[data-near="near"] { background: #fef3c7; color: #78350f; border-color: #fcd34d; }
+.boss-nearby[data-near="near"] .boss-nearby-arrow { background: #fde68a; }
+.boss-nearby[data-near="close"] { background: #e11d48; color: #fff; border-color: #be123c; }
+.boss-nearby[data-near="close"] .boss-nearby-arrow { background: rgb(255 255 255 / .22); }
+@media (prefers-reduced-motion: no-preference) {
+  .boss-nearby[data-near="close"] { animation: boss-nearby-pulse .9s ease-in-out infinite; }
+}
+@keyframes boss-nearby-pulse { 50% { box-shadow: 0 0 0 6px rgb(225 29 72 / .25); } }

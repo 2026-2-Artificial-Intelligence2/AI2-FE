@@ -125,6 +125,10 @@ export function Messenger({ game, send, playing, closing, onDismiss, docked = fa
         </div> : <div ref={list} role="log" aria-label={heading + ' 메시지'}
           className={'flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3 ' + (docked ? 'bg-ui-subtle' : 'bg-blue-50/45 dark:bg-ui-desktop')}>
           {messages.length ? messages.map(message => {
+            if (message.system) return <p key={message.id} role="note"
+              className="mx-auto max-w-[95%] rounded-full bg-amber-100 px-3 py-1 text-center text-xs font-semibold text-amber-950 dark:bg-amber-950 dark:text-amber-100">
+              📢 {message.text}{message.second >= 0 && <span className="ml-1.5 font-normal tabular-nums opacity-70">{clock(message.second)}</span>}
+            </p>;
             const mine = message.from === me;
             return <article key={message.id} className={mine ? 'max-w-[90%] self-end text-right' : 'max-w-[90%] self-start'}>
               <p className="mb-1 text-xs text-ui-caption">{mine ? '나' : message.from}

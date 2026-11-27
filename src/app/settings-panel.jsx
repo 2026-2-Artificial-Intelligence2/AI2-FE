@@ -90,6 +90,14 @@ export function SettingsPanel({ theme, onToggleTheme }) {
         <p className="text-xs leading-relaxed text-ui-secondary">
           부장님 발소리는 뒤에서 날수록 먹먹하게 들려요. 이어폰을 끼면 방향을 더 잘 알 수 있어요.
         </p>
+        <label className="flex items-start gap-2.5 rounded-lg bg-ui-subtle p-2.5">
+          <input type="checkbox" className="mt-0.5 size-4 shrink-0" checked={settings.footstepHint}
+            onChange={event => updateSound({ footstepHint: event.target.checked })} />
+          <span>
+            <span className="block font-semibold">화면에 발소리 표시</span>
+            <span className="block text-xs text-ui-secondary">부장님이 걷는 동안 컴퓨터 화면 아래쪽에 방향과 거리를 보여 줘요.</span>
+          </span>
+        </label>
       </section>
     </div>}
   </div>;

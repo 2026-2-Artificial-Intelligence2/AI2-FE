@@ -8,6 +8,7 @@ export const SOUND_CHANNELS = ['master', 'effects', 'boss', 'voice'];
 
 const defaults = {
   master: 0.8, effects: 1, boss: 1, voice: 1,
+  footstepHint: true,   // 컴퓨터 화면에 부장님 발소리 방향 표시
   muted: { master: false, effects: false, boss: false, voice: false },
 };
 
@@ -21,6 +22,7 @@ function load() {
       settings[channel] = clamp(saved[channel]) ?? defaults[channel];
       settings.muted[channel] = saved.muted?.[channel] === true;
     }
+    settings.footstepHint = saved.footstepHint !== false;
     return settings;
   } catch {
     return defaults;

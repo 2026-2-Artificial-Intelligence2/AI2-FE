@@ -4,6 +4,7 @@ import { useTheme } from './use-theme.js';
 import { useVoice } from './use-voice.js';
 import { VoicePanel } from './voice-panel.jsx';
 import { SettingsPanel } from './settings-panel.jsx';
+import { BossNearby } from './boss-nearby.jsx';
 import { GameGauges } from './game-gauges.jsx';
 import { enableSound, sfx } from '../shared/audio/spatial-audio.js';
 import { clock } from '../shared/format.js';
@@ -241,6 +242,7 @@ export function App() {
         {market && !result && <Market visible={desktopView === 'MARKET'} active={desktopInteractive && !messengerOpen && view === 'MARKET'} game={game} name={name} gauges={gauges} loanAction={loanAction} theme={theme} send={send} />}
         {result && <Results result={result} name={name} host={host} solo={solo} connected={connected} send={send} restartError={actionErrors.RESTART?.message} />}
         {!inLobby && messenger}
+        {computer && desktopShown && <BossNearby market={market} />}
         {computer && desktopShown && <Notifications game={game} inbox={inbox} toggleInbox={toggleInbox}
           messengerOpen={messengerOpen} openMessenger={openMessenger} lastChat={lastChat} lastNews={lastNews} dismissNews={dismissNews} />}
         {activeDialog === 'loan' && showLoan &&

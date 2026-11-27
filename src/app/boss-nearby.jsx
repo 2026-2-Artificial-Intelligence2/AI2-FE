@@ -1,0 +1,38 @@
+import React from 'react';
+import { useSoundSettings } from '../shared/sound-settings.js';
+
+// 8방향(내 자리에서 앞이 위쪽 화살표). 화살표와 글이 늘 같은 방향을 말하도록 한 곳에서 정한다.
+const ARROWS = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'];
+const WHERE = ['앞', '오른쪽 앞', '오른쪽', '오른쪽 뒤', '뒤', '왼쪽 뒤', '왼쪽', '왼쪽 앞'];
+
+/**
+ * 부장님 발소리가 어디서 나는지(내 자리 기준 방향·거리). 발소리와 같은 정보만 보여 준다:
+ * 부장님이 걷는 동안만 뜨고, 누구에게 가는지는 알려주지 않는다.
+ */
+export function describeStep(step) {
+  const { to, listener } = step;
+  const x = to.x - listener.position.x;
+  const z = to.z - listener.position.z;
+  const ahead = listener.forwardZ * z;     // 앞(+)·뒤(−)
+  const right = -listener.forwardZ * x;    // 오른쪽(+)·왼쪽(−)
+  const distance = Math.hypot(x, z);
+  const angle = Math.atan2(right, ahead);  // 0 = 앞, π/2 = 오른쪽
+  const sector = (Math.round(angle / (Math.PI / 4)) + 8) % 8;
+  const near = distance <= 1.6 ? 'close' : distance <= 3.2 ? 'near' : 'far';
+  return { arrow: ARROWS[sector], where: WHERE[sector], near };
+}
+
+const nearLabel = { close: '바로 근처', near: '가까워요', far: '멀리' };
+
+export function BossNearby({ market }) {
+  const { footstepHint } = useSoundSettings();
+  if (!footstepHint || !market?.walking || !market.step) return null;
+  const { arrow, where, near } = describeStep(market.step);
+  return <div role="status" aria-label={'부장님 발소리 ' + where + ' ' + nearLabel[near]} data-near={near}
+    className="boss-nearby pointer-events-none fixed bottom-6 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-bold shadow-lg">
+    <span aria-hidden="true" className="text-base">👞</span>
+    <span aria-hidden="true" className="boss-nearby-arrow grid size-6 place-items-center rounded-full text-base leading-none">{arrow}</span>
+    <span aria-hidden="true">{where}</span>
+    <span aria-hidden="true" className="text-xs font-semibold opacity-80">{nearLabel[near]}</span>
+  </div>;
+}
