@@ -107,7 +107,9 @@ export function Messenger({ game, send, playing, closing, onDismiss, docked = fa
         <nav aria-label="대화 목록" className="space-y-1">
           <Channel active={selected === group} title="단체방" detail={members.length + 1 + '명'} marker="#" onSelect={() => setChannel(group)} />
           {members.map(member => <Channel key={member.label} active={selected === member.label} title={member.label}
-            detail={member.online ? '접속 중' : '오프라인'} marker={member.label} onSelect={() => setChannel(member.label)} />)}
+            detail={member.online ? '접속 중' : '오프라인'}
+            marker={Array.from(member.label.normalize('NFC').trim())[0] ?? '?'}
+            onSelect={() => setChannel(member.label)} />)}
           {playing && <Channel active={anonymous} title="익명 찌라시" detail={leakReceipt ? '이번 판 전송 완료' : '한 판에 한 번'}
             marker="!" onSelect={() => setChannel(rumor)} />}
         </nav>

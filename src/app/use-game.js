@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { footsteps, cough } from '../shared/audio/spatial-audio.js';
+import { STAFF, staffAtSeat } from '../shared/scene/office-seats.js';
 
 const seatKey = 'officeStockSeat';
 const loginKey = 'officeStockLogin';
@@ -120,6 +121,7 @@ function reduce(game, message, receivedAt) {
     case 'view': return { ...game, view: message.view };
     case 'meeting': return {
       ...game, view: 'MEETING', meeting: message.reason, popup: null,
+      meetingCharacter: message.character ?? (game.view === 'MEETING' ? game.meetingCharacter : undefined),
       meetingStarted: game.view === 'MEETING' ? game.meetingStarted : receivedAt,
     };
     case 'result': return { ...game, view: null, result: message, popup: null, status: '' };
@@ -323,7 +325,11 @@ export function useGame() {
           office.current = null;
         }
         if (message.type === 'replaced') replaced = true;
-        if (message.type === 'meeting') newsNumber = Math.max(newsNumber, message.newsNumber ?? 0);
+        if (message.type === 'meeting') {
+          newsNumber = Math.max(newsNumber, message.newsNumber ?? 0);
+          const position = message.seat ?? office.current?.packet?.step?.listener?.position;
+          message = { ...message, character: staffAtSeat(position) ?? STAFF[seatLabels.indexOf(youLabel)] };
+        }
 
         let popup;
         if (message.type === 'market') {
@@ -331,7 +337,11 @@ export function useGame() {
           if (previous?.packet.beat !== message.beat) beatStarted = receivedAt;
           const meetingStarts = new Map();
           for (const colleague of message.colleagues ?? []) {
-            if (colleague.meeting) meetingStarts.set(colleague.label, previous?.meetingStarts.get(colleague.label) ?? receivedAt);
+            if (!colleague.meeting) continue;
+            meetingStarts.set(colleague.label, {
+              startedAt: previous?.meetingStarts.get(colleague.label)?.startedAt ?? receivedAt,
+              character: staffAtSeat(colleague.seat) ?? STAFF[seatLabels.indexOf(colleague.label)],
+            });
           }
           office.current = { packet: message, beatStarted, meetingStarts, seatLabels, youLabel, roundSeconds };
           if (message.walking && lastStep !== message.beat && message.step) {

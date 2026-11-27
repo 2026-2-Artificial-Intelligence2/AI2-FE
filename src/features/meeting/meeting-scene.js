@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { createMeetingPerformance, furnishMeetingRoom } from './meeting-performance.js';
 
-export function mountMeetingScene(canvas, started = performance.now()) {
+export function mountMeetingScene(canvas, started = performance.now(), character, { onFrame, onError }) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.shadowMap.enabled = true;
@@ -19,14 +19,42 @@ export function mountMeetingScene(canvas, started = performance.now()) {
   scene.add(key);
 
   furnishMeetingRoom(scene);
-  const animate = createMeetingPerformance(scene);
+  const sequence = createMeetingPerformance(scene);
+  sequence.setPlayer(character);
   const camera = new THREE.PerspectiveCamera(39, 1, 0.05, 32);
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   let width = 0;
   let height = 0;
+  let drawn = false;
+  let failed = false;
+  const fail = error => {
+    if (failed) return;
+    failed = true;
+    renderer.setAnimationLoop(null);
+    console.warn('Could not render the meeting scene:', error);
+    onError();
+  };
+  const contextLost = () => fail('WebGL context lost');
   function draw() {
+    if (failed || !width || !height) return;
+    if (renderer.getContext().isContextLost()) {
+      contextLost();
+      return;
+    }
+    try {
+      if (sequence.loadError) throw sequence.loadError;
+      renderFrame();
+      if (!drawn && sequence.ready) {
+        drawn = true;
+        onFrame();
+      }
+    } catch (error) {
+      fail(error);
+    }
+  }
+  function renderFrame() {
     const elapsed = (performance.now() - started) / 1000;
-    const burst = animate(elapsed, reducedMotion);
+    const burst = sequence.update(elapsed, reducedMotion);
     const shake = burst * Math.sin(elapsed * 68);
     camera.position.set(1.06 + shake * 0.036, 1.52 + burst * 0.02, 5.02);
     camera.lookAt(-0.16, 0.86, 0.06);
@@ -47,11 +75,14 @@ export function mountMeetingScene(canvas, started = performance.now()) {
 
   const observer = new ResizeObserver(resize);
   observer.observe(canvas);
-  resize();
+  canvas.addEventListener('webglcontextlost', contextLost);
   renderer.setAnimationLoop(draw);
+  resize();
   return () => {
     observer.disconnect();
+    canvas.removeEventListener('webglcontextlost', contextLost);
     renderer.setAnimationLoop(null);
+    sequence.dispose();
     key.shadow.dispose();
     renderer.dispose();
     renderer.forceContextLoss();

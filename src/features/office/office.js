@@ -1,14 +1,20 @@
 import * as THREE from 'three';
-import {box, character} from '../../shared/scene/character.js';
-import {BOSS, STAFF, glbActor} from '../../shared/scene/glb-actor.js';
-import {furnish} from './furnishings.js';
+import {box} from '../../shared/scene/character.js';
+import {BOSS, glbActor} from '../../shared/scene/glb-actor.js';
+import {OFFICE_SEATS as seats, STAFF} from '../../shared/scene/office-seats.js';
+import {DESK_DROP, OFFICE_CENTER_X, OFFICE_HALF_DEPTH, OFFICE_LENGTH, SUN_PATH, furnish} from './furnishings.js';
+import {fitDeskWorker} from './office-seating.js';
 import {turnListener} from '../../shared/audio/spatial-audio.js';
 import {addMeetingWindow} from './office-meeting-window.js';
+import {finishWalls} from './office-walls.js';
+import {dayCurve} from './window-sky.js';
+
+const SUN_INTENSITY = [[0, 2.0], [0.3, 2.35], [0.6, 2.1], [0.8, 1.35], [1, 0.4]];
+const SUN_COLOR = [[0, [1, 0.9, 0.78]], [0.3, [1, 0.92, 0.8]], [0.6, [1, 0.86, 0.68]], [0.8, [1, 0.66, 0.42]], [1, [0.72, 0.68, 0.85]]];
+const SKY_INTENSITY = [[0, 2.65], [0.3, 2.8], [0.7, 2.6], [1, 2.0]];
 import {makeVoiceTextures, voiceArcCount} from './office-voice.js';
 
-const seats = [[-1,-1],[1,-1],[-1,1],[1,1],[5,-1],[7,-1],[5,1],[7,1]];
-const colors = [0x89a8ce,0xe4a39e,0x8abdad,0xdfb181,0xab9fc1,0xe6b3a2,0x87b4bb,0xb895ba];
-let scene, camera, renderer, boss, latest, canvas, meetingWindow, updateSky, sun;
+let scene, camera, renderer, boss, latest, canvas, meetingWindow, updateSky, sun, sky;
 let timeOfDay;
 let yaw=0, pitch=0, self=-1;
 let focus = false;
@@ -34,41 +40,40 @@ function init() {
   renderer.shadowMap.enabled=true;
   renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   renderer.toneMapping=THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure=1.18;   // a bright, airy office
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0xe9e5da);
   camera = new THREE.PerspectiveCamera(68,1,0.06,45);
   camera.rotation.order='YXZ';
-  scene.add(new THREE.HemisphereLight(0xfff4df,0xb7b5c2,2.3));
-  sun=new THREE.DirectionalLight(0xffecd3,1.8);
-  sun.position.set(-4,7,4);
+  // Brighter sky light makes up for the sun now reaching the room only through the windows.
+  sky=new THREE.HemisphereLight(0xffe6cc,0xbeb2a7,2.65);
+  scene.add(sky);
+  sun=new THREE.DirectionalLight(0xffdfb4,2.15);
+  sun.target.position.set(OFFICE_CENTER_X, 0, 0);
+  scene.add(sun.target);
   sun.castShadow=true;
   sun.shadow.mapSize.set(1024,1024);
-  Object.assign(sun.shadow.camera,{left:-11,right:11,top:7,bottom:-7,far:32});
+  // Wide enough to hold the whole office from any point on the sun's path.
+  Object.assign(sun.shadow.camera,{left:-12,right:12,top:10,bottom:-10,far:40});
   sun.shadow.camera.updateProjectionMatrix();
-  sun.shadow.intensity=0.60;
+  sun.shadow.intensity=0.82;
   sun.shadow.normalBias=0.022;
   scene.add(sun);
-  box(scene,[18,0.1,12],[2,-0.05,0],0xb1c2bc);
-  for (const z of [-5.5,5.5]) {
-    box(scene,[18,3.6,0.15],[2,1.8,z],0xe2ddcf).castShadow=false;
-  }
-  const furniture = furnish(scene);
+  box(scene,[OFFICE_LENGTH,0.1,OFFICE_HALF_DEPTH*2+0.2],[OFFICE_CENTER_X,-0.05,0],0xb8a58e);
+  const furniture = furnish(scene, () => { monitorFrameDrawn = false; });
   const { dressDesk } = furniture;
   updateSky = furniture.updateSky;
   meetingWindow=addMeetingWindow(scene);
+  // Inner faces of the walls; the west wall is solid only south of the meeting-room glass.
+  const unfinishWalls = finishWalls(scene, {
+    west: -6.83, east: 8.05, north: -OFFICE_HALF_DEPTH + 0.075, south: OFFICE_HALF_DEPTH - 0.075, westSolid: [0.3, OFFICE_HALF_DEPTH - 0.075],
+  });
   voiceTextures=makeVoiceTextures();
   for (const [i,[x,z]] of seats.entries()) {
     const forward=-Math.sign(z);
-    const deskZ=z+0.65*forward;
-    box(scene,[1.84,0.085,0.93],[x,0.76,deskZ],0xe1bd9e);
-    for(const dx of [-0.79,0.79]) box(scene,[0.09,0.74,0.7],[x+dx,0.37,deskZ],0x789192);
-    box(scene,[0.08,0.21,0.1],[x,0.88,deskZ],0x474b4c);
-    box(scene,[0.65,0.37,0.05],[x,1.1,deskZ],0x647781);
-    box(scene,[0.6,0.32,0.02],[x,1.1,deskZ-forward*0.035],0x9bbec1);
-    box(scene,[0.43,0.025,0.15],[x,0.82,deskZ-forward*0.28],0x596566);
-    box(scene,[0.52,0.09,0.46],[x,0.43,z],0x89a3a2);
-    dressDesk(x,z,i);
-    const person=glbActor(STAFF[i], character({topColor:colors[i],skin:[0xf0c5a7,0xe4b098,0xca9278][i%3],hairColor:[0x57434b,0x815a4d,0x473847][i%3],hairId:['short','crop','bun'][i%3],accessoryId:i%3?'none':'glasses'}));
+    const fitChair = dressDesk(x,z,i);
+    const person=glbActor(STAFF[i]);
+    person.fitChair = fitChair;
     person.root.position.set(x,0,z);
     person.root.rotation.y=forward===1?0:Math.PI;
     const voice = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -83,18 +88,30 @@ function init() {
     workers.push(person);
     scene.add(person.root);
   }
-  boss=glbActor(BOSS, character({topId:'jacket',topColor:0x34464d,accessoryId:'glasses'},false));
+  boss=glbActor(BOSS);
   scene.add(boss.root);
+  return { ...furniture, dispose() { furniture.dispose(); unfinishWalls(); } };
 }
 
 // Rigged staff sit at their desks; a slow head sway keeps them from looking frozen.
-function poseWorker(person, time, dt) {
-  if (!person.ready) {
-    person.fallback.pose(time, false);
-    return;
-  }
-  person.play('Sit (desk)', { fade: 0 });
+function poseWorker(person, name, time, dt) {
+  if (!person.ready) return;
+  const seated = person.play('Sit (desk)', { fade: 0 });
   person.mixer.update(dt);
+  if (seated) {
+    person.seatedArms ??= fitDeskWorker(person, name);
+    const gesture = person.deskGesture ??= {start: time + 4 + Math.random() * 5, hand: 0};
+    const duration = 0.42;
+    if (time > gesture.start + duration) {
+      gesture.start = time + 4 + Math.random() * 5;
+      gesture.hand = Math.random() < 0.5 ? 0 : 1;
+    }
+    const elapsed = (time - gesture.start) / duration;
+    const amount = reduceMotion || elapsed <= 0 ? 0 : Math.sin(elapsed * Math.PI) ** 2 * 0.55;
+    for (const [joint, resting, tapping, hand] of person.seatedArms) {
+      joint.quaternion.copy(resting).slerp(tapping, hand === gesture.hand ? amount : 0);
+    }
+  }
   const head = person.bone('head');
   if (head) {
     // Sway from the seated head pose captured once; the clip may not key the head every frame,
@@ -111,10 +128,7 @@ function poseWorker(person, time, dt) {
 const BOSS_WALK_SPEED = 0.48;
 let bossBeat = 0, bossBeatStarted;
 function poseBoss(walking, step, beatStarted, dt) {
-  if (!boss.ready) {
-    boss.fallback.pose(performance.now() / 1000, walking);
-    return;
-  }
+  if (!boss.ready) return;
   if (beatStarted !== bossBeatStarted) {
     bossBeatStarted = beatStarted;
     bossBeat += 1;
@@ -140,8 +154,9 @@ function draw(now) {
   lastDraw = now;
   const {packet, beatStarted, meetingStarts, seatLabels, youLabel, roundSeconds} = latest;
   const {step,walking} = packet;
-  const meetingStarted = meetingStarts.values().next().value;
-  meetingWindow.update(meetingStarted, now);
+  const meeting = meetingStarts.values().next().value;
+  const meetingCharacters = new Set([...meetingStarts.values()].map(entry => entry.character));
+  meetingWindow.update(meeting, now);
   const {position,forwardZ}=step.listener;
   self=seats.findIndex(([x,z])=>position.x===x && position.z===z);
   const w=canvas.clientWidth,h=canvas.clientHeight;
@@ -149,17 +164,23 @@ function draw(now) {
   if (zoom === 1 && monitorFrameDrawn && w === width && h === height) return;
   monitorFrameDrawn = zoom === 1;
   const elapsed = roundSeconds > 0 ? 1 - packet.remainingSeconds / roundSeconds : 0;
-  const daylight = THREE.MathUtils.smoothstep(elapsed, 0.12, 1);
+  const daylight = THREE.MathUtils.clamp(elapsed, 0, 1);
   timeOfDay = timeOfDay === undefined || Math.abs(daylight - timeOfDay) < 0.001
     ? daylight : THREE.MathUtils.lerp(timeOfDay, daylight, 0.08);
   updateSky(timeOfDay);
-  sun.intensity = THREE.MathUtils.lerp(1.8, 0.65, timeOfDay);
+  // Sun and sky follow the window view: bright midday, golden sunset, dusk at quitting time,
+  // when the ceiling lamps take over.
+  const [sx, sy, sz] = dayCurve(timeOfDay, SUN_PATH);
+  sun.position.set(OFFICE_CENTER_X + sx, sy, sz);   // the light and shadows travel across the room
+  sun.intensity = dayCurve(timeOfDay, SUN_INTENSITY);
+  sun.color.setRGB(...dayCurve(timeOfDay, SUN_COLOR));
+  sky.intensity = dayCurve(timeOfDay, SKY_INTENSITY);
   if (w && h && (w!==width || h!==height)) {
     width=w; height=h;
     renderer.setSize(w,h,false);
     camera.aspect=w/h;camera.updateProjectionMatrix();
   }
-  camera.position.set(position.x, 1.4 - 0.24 * zoom, position.z + forwardZ * 0.45 * zoom);
+  camera.position.set(position.x, 1.4 - (0.24 + DESK_DROP) * zoom, position.z + forwardZ * 0.45 * zoom);
   camera.rotation.set(pitch * (1 - zoom) - 0.27 * zoom, (forwardZ === 1 ? Math.PI : 0) + yaw * (1 - zoom), 0, 'YXZ');
   const fov = 68 - zoom * 40;
   if (fov !== camera.fov) {
@@ -170,17 +191,18 @@ function draw(now) {
   const knowSeats = self >= 0 && youLabel && seatLabels[self] === youLabel;
   workers.forEach((person,i)=>{
     const label = knowSeats ? seatLabels[i] : undefined;
-    person.root.visible = i !== self && !meetingStarts.has(label);
+    person.root.visible = person.ready && i !== self &&
+      !meetingStarts.has(label) && !meetingCharacters.has(STAFF[i]);
     const count = zoom < 1 && person.root.visible && label ? voiceArcCount(micLevels?.[label] ?? 0) : 0;
     person.voice.visible = count > 0;
     if (count) person.voice.material.map = voiceTextures[count - 1];
-    poseWorker(person, now/1000+i*1.23+(i<participants.length?0:2), dt);
+    poseWorker(person, STAFF[i], now/1000+i*1.23+(i<participants.length?0:2), dt);
   });
   const t=walking?Math.min(1,(now-beatStarted)/2000):1;
   boss.root.position.set(THREE.MathUtils.lerp(step.from.x,step.to.x,t),0,THREE.MathUtils.lerp(step.from.z,step.to.z,t));
   if (walking) boss.root.rotation.y=Math.atan2(step.to.x-step.from.x,step.to.z-step.from.z);
   // Until the server publishes actual boss presence, avoid showing a stationary boss during lunch.
-  boss.root.visible=meetingStarted === undefined &&
+  boss.root.visible=boss.ready && meeting === undefined &&
     (walking || !(packet.lunchStartsInSeconds<=0 && packet.lunchEndsInSeconds>0));
   poseBoss(walking && t<1, step, beatStarted, dt);
   renderer.render(scene,camera);
@@ -195,10 +217,11 @@ export function mountOffice(element) {
   monitorFrameDrawn = false;
   lastDraw = undefined;
   transition = { from: 0, to: 0, started: performance.now() };
-  init();
+  const furniture = init();
   renderer.setAnimationLoop(draw);
   return () => {
     renderer.setAnimationLoop(null);
+    furniture.dispose();
     scene.traverse(object => {
       if (object.isDirectionalLight) object.shadow.dispose();
       if (object.userData.disposeWithOffice) {
@@ -209,6 +232,7 @@ export function mountOffice(element) {
     });
     workers.forEach(person => { person.voice.material.dispose(); person.dispose(); });
     boss.dispose();
+    meetingWindow.dispose();
     voiceTextures.forEach(texture => texture.dispose());
     renderer.dispose();
     renderer.forceContextLoss();

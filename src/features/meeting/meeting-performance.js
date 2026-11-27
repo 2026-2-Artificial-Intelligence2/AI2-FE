@@ -1,44 +1,10 @@
 import * as THREE from 'three';
-import { box, character, characterHead, defaultLook, oval } from '../../shared/scene/character.js';
-import { BOSS, PLAYER, glbActor, makeBat } from '../../shared/scene/glb-actor.js';
+import { box, character, oval } from '../../shared/scene/character.js';
+import { BOSS, glbActor, makeBat } from '../../shared/scene/glb-actor.js';
 
 const impacts = [0.95, 2.05, 3.20];
 const frame = 0x445469;
-const skin = defaultLook.skin;
 const up = new THREE.Vector3(0, 1, 0);
-
-function capsule(parent, from, to, radius, color) {
-  const start = new THREE.Vector3(...from);
-  const end = new THREE.Vector3(...to);
-  const direction = end.clone().sub(start);
-  const centre = start.addScaledVector(direction, 0.5);
-  const mesh = oval(parent, [radius, direction.length() / 2 + radius * 0.4, radius], centre.toArray(), color);
-  mesh.quaternion.setFromUnitVectors(up, direction.normalize());
-  return mesh;
-}
-
-function bentPlayer(scene) {
-  const root = new THREE.Group();
-  root.position.set(0.06, 0, 0.82);
-  scene.add(root);
-  const hips = [-0.38, 0.86, 0];
-  const shoulders = [0.38, 0.47, 0];
-  capsule(root, hips, shoulders, 0.17, 0x7299b3);
-  oval(root, [0.16, 0.13, 0.16], hips, 0x34455e);
-  for (const side of [-1, 1]) {
-    const z = side * 0.15;
-    capsule(root, [hips[0], hips[1], z * 0.65], [-0.96, 0.1, z], 0.082, 0x34455e);
-    oval(root, [0.125, 0.052, 0.074], [-1.02, 0.055, z], 0x343437);
-    capsule(root, [0.34, 0.49, z], [0.71, 0.07, z * 1.2], 0.065, 0x7299b3);
-    oval(root, [0.094, 0.035, 0.058], [0.76, 0.043, z * 1.2], skin);
-  }
-  const head = characterHead({ hairId: 'crop', hairColor: 0x685043, expression: 'worried' });
-  head.position.set(0.59, 0.43, 0);
-  head.rotation.set(0.22, 0.58, -0.56);
-  head.scale.multiplyScalar(0.88);
-  root.add(head);
-  return root;
-}
 
 export function furnishMeetingRoom(scene, front = 5) {
   const depth = front + 2.9;
@@ -160,10 +126,8 @@ function swingBoss(actor, elapsed, reducedMotion) {
 
 export function createMeetingPerformance(scene) {
   const props = breakables(scene);
-  const bent = bentPlayer(scene);
-  scene.remove(bent);
-  const player = glbActor(PLAYER, { root: bent });
-  scene.add(player.root);
+  let player;
+  let playerName;
   const boss = glbActor(BOSS, character({ topId: 'jacket', topColor: 0x34464d, accessoryId: 'glasses' }, false));
   boss.root.position.set(-0.65, 0, -0.38);
   boss.root.rotation.y = 0.22;
@@ -189,15 +153,31 @@ export function createMeetingPerformance(scene) {
   // Once both rigged models are in: give the boss a real bat in his fist, lay the player in
   // the plank, and put the player's backside (and the hit burst) where the bat actually lands.
   let staged = false;
+  let realBat;
+  function setPlayer(name) {
+    if (name === playerName) return;
+    if (player) {
+      player.dispose();
+      scene.remove(player.root);
+    }
+    playerName = name;
+    player = name ? glbActor(name) : undefined;
+    if (player) scene.add(player.root);
+    staged = false;
+  }
   function stage() {
-    if (staged || !boss.ready || !player.ready) return;
+    if (staged || !boss.ready || !player?.ready) return;
     staged = true;
     bat.visible = false;
     const grip = boss.bone('grip.R');
-    const realBat = makeBat();
-    grip.add(realBat);
+    if (!realBat) {
+      realBat = makeBat();
+      grip.add(realBat);
+    }
     player.model.rotation.y = Math.PI / 2;          // head toward +X, like the procedural pose
-    player.play('Plank hips up (엎드려뻗쳐)', { fade: 0 });
+    const clip = player.actions.has('Plank hips up (엎드려뻗쳐)')
+      ? 'Plank hips up (엎드려뻗쳐)' : 'Plank (엎드려뻗쳐)';
+    player.play(clip, { fade: 0 });
     player.mixer.update(0);
     swingBoss(boss, impacts[0], false);              // strike frame of the first swing
     scene.updateMatrixWorld(true);
@@ -208,7 +188,7 @@ export function createMeetingPerformance(scene) {
     hit.position.set(landing.x, landing.y, landing.z);
   }
 
-  return (elapsed, reducedMotion) => {
+  function update(elapsed, reducedMotion) {
     stage();
     let swing = 0;
     let burst = 0;
@@ -232,9 +212,20 @@ export function createMeetingPerformance(scene) {
       direction.lerpVectors(windup, strike, swing).normalize();
       bat.quaternion.setFromUnitVectors(up, direction);
     }
-    player.root.scale.y = reducedMotion ? 1 : 1 - 0.11 * burst;
+    if (player) player.root.scale.y = reducedMotion ? 1 : 1 - 0.11 * burst;
     hit.visible = !reducedMotion && burst > 0;
     hit.scale.setScalar(1.45 - burst * 0.42);
     return reducedMotion ? 0 : burst;
+  }
+  return {
+    setPlayer, update,
+    get ready() { return player ? staged : boss.ready; },
+    get loadError() { return boss.loadError ?? player?.loadError; },
+    dispose() {
+      setPlayer(undefined);
+      boss.dispose();
+      realBat?.geometry.dispose();
+      realBat?.material.dispose();
+    },
   };
 }
