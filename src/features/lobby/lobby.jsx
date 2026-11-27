@@ -16,7 +16,7 @@ function SoloDuration({ id, minutes, disabled, onChange }) {
   );
 }
 
-export function Entry({ connected, send, status, account, accountNotice, actionErrors, startingSolo, leaderboard }) {
+export function Entry({ connected, send, status, account, accountNotice, actionErrors, startingSolo, leaderboard, records, recoveryCode, gameNotice, dismissRecoveryCode }) {
   const [mode, setMode] = useState('TEAM');
   const [minutes, setMinutes] = useState(10);
   const requested = useRef(false);
@@ -45,7 +45,8 @@ export function Entry({ connected, send, status, account, accountNotice, actionE
             {status && <p id='status' role='status' className='mt-2 text-xs text-ui-secondary'>{status}</p>}
           </div>
 
-          <AccountEntry account={account} notice={accountNotice} actionErrors={actionErrors} connected={connected} send={send} />
+          <AccountEntry account={account} notice={accountNotice} actionErrors={actionErrors} connected={connected} send={send}
+            records={records} recoveryCode={recoveryCode} gameNotice={gameNotice} dismissRecoveryCode={dismissRecoveryCode} />
 
           <section aria-labelledby='play-title' className={'space-y-3 transition-opacity ' + (ready ? '' : 'opacity-60')}>
             <div className='flex items-center justify-between gap-2'>

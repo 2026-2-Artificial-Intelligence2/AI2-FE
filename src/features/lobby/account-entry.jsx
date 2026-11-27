@@ -1,4 +1,6 @@
 import React, { useEffect, useId, useState } from 'react';
+import { AccountDialog } from '../account/account-dialog.jsx';
+import { RecoveryCodeDialog, ResetPasswordDialog } from '../account/recovery-dialogs.jsx';
 
 // 첫 화면의 "누구로 출근할까요?" 카드. 로그인·회원가입·게스트를 탭으로 바꿔 가며 같은 자리에서 바로 입력한다.
 // 들어오면 이름표(이름, 회원/게스트, 기록 저장 여부)로 바뀐다.
@@ -49,13 +51,23 @@ function NameField({ id, label, autoComplete, disabled, hint, placeholder }) {
   </div>;
 }
 
-export function AccountEntry({ account, notice, actionErrors, connected, send }) {
+export function AccountEntry({ account, notice, actionErrors, connected, send, records, recoveryCode, gameNotice, dismissRecoveryCode }) {
   const ids = useId();
   const [tab, setTab] = useState('LOGIN');
   const [switching, setSwitching] = useState(false);
   const [mismatch, setMismatch] = useState('');
   const [shown, setShown] = useState(false);
   const { pending, submit, error } = useRequest({ account, actionErrors, connected, send });
+  const [dialog, setDialog] = useState(null);   // 'ACCOUNT' 내 정보, 'RESET' 비밀번호 찾기
+  const closeDialog = React.useCallback(() => setDialog(null), []);
+  // 가입·복구 뒤 새 복구 코드는 다른 창보다 먼저 보여 준다.
+  const dialogs = <>
+    {dialog === 'ACCOUNT' && <AccountDialog account={account} records={records} recoveryCode={recoveryCode} notice={gameNotice}
+      actionErrors={actionErrors} connected={connected} send={send} onDismiss={closeDialog} />}
+    {dialog === 'RESET' && <ResetPasswordDialog account={account} actionErrors={actionErrors} connected={connected} send={send}
+      onDismiss={closeDialog} />}
+    {recoveryCode && dialog !== 'RESET' && <RecoveryCodeDialog key={recoveryCode} code={recoveryCode} onDismiss={dismissRecoveryCode} />}
+  </>;
 
   // 로그인·가입·게스트가 되면 입력 화면을 닫는다.
   useEffect(() => { setSwitching(false); setMismatch(''); }, [account?.name, account?.member]);
@@ -79,6 +91,7 @@ export function AccountEntry({ account, notice, actionErrors, connected, send })
 
   if (account && !switching) {
     return <section aria-label="내 이름표" className="rounded-xl border border-ui-border bg-ui-subtle p-4">
+      {dialogs}
       <div className="flex items-center gap-3">
         <span aria-hidden="true" className={'grid size-11 shrink-0 place-items-center rounded-full text-base font-extrabold ' +
           (account.member ? 'bg-indigo-700 text-white dark:bg-[#3d3b50]' : 'bg-ui-surface text-ui-secondary ring-1 ring-ui-border')}>
@@ -98,8 +111,12 @@ export function AccountEntry({ account, notice, actionErrors, connected, send })
           </p>
         </div>
         {account.member
-          ? <button type="button" className="control shrink-0 text-xs" disabled={!connected || pending}
-            onClick={() => submit('LOGOUT')}>로그아웃</button>
+          ? <div className="flex shrink-0 flex-col gap-1.5 min-[24rem]:flex-row">
+            <button type="button" className="control text-xs" disabled={!connected}
+              onClick={() => setDialog('ACCOUNT')}>내 정보</button>
+            <button type="button" className="control text-xs" disabled={!connected || pending}
+              onClick={() => submit('LOGOUT')}>로그아웃</button>
+          </div>
           : <button type="button" className="control shrink-0 text-xs" disabled={!connected}
             onClick={() => { setTab('SIGNUP'); setSwitching(true); }}>회원으로 저장하기</button>}
       </div>
@@ -108,6 +125,7 @@ export function AccountEntry({ account, notice, actionErrors, connected, send })
   }
 
   return <section aria-labelledby={ids + '-title'} className="rounded-xl border border-ui-border p-4">
+    {dialogs}
     <div className="mb-3 flex items-center justify-between gap-2">
       <h3 id={ids + '-title'} className="text-sm font-bold">누구로 출근할까요?</h3>
       {switching && <button type="button" className="text-xs font-semibold text-ui-secondary underline"
@@ -171,6 +189,8 @@ export function AccountEntry({ account, notice, actionErrors, connected, send })
       className={'mt-3 text-center text-xs text-ui-secondary ' + (tab === 'LOGIN' ? '' : 'invisible')}>
       처음이라면 <button type="button" className="font-semibold text-ui-text underline" onClick={() => setTab('SIGNUP')}>회원가입</button>
       {' '}또는 <button type="button" className="font-semibold text-ui-text underline" onClick={() => setTab('GUEST')}>게스트로 시작</button>
+      <span className="mx-1.5 text-ui-caption" aria-hidden="true">·</span>
+      <button type="button" className="font-semibold text-ui-text underline" onClick={() => setDialog('RESET')}>비밀번호를 잊었어요</button>
     </p>
   </section>;
 }

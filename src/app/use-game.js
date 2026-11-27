@@ -32,7 +32,16 @@ function commandResponse(command) {
   const [verb, target, symbol, price, quantity] = command.split(' ', 5);
   switch (verb) {
     case 'SIGNUP':
-    case 'LOGIN': return [verb, message => message.type === 'profile'];
+    case 'LOGIN':
+    case 'RESET': return [verb, message => message.type === 'profile'];
+    case 'RECORDS': return [verb, message => message.type === 'records'];
+    // 내 정보: PROFILE NAME·PASSWORD·RECOVERY·DELETE는 각각 따로 오류를 받는다(PROFILE_NAME 등).
+    case 'PROFILE': return ['PROFILE_' + target, {
+      NAME: message => message.type === 'profile',
+      PASSWORD: message => message.type === 'notice',
+      RECOVERY: message => message.type === 'recoveryCode',
+      DELETE: message => message.type === 'accountDeleted',
+    }[target] ?? (() => false)];
     case 'GUEST': return [verb, message => message.type === 'guest'];
     case 'LOGOUT': return [verb, message => message.type === 'loggedOut'];
     case 'LEADERBOARD': return [verb, message => message.type === 'leaderboard'];
@@ -81,12 +90,20 @@ function reduce(game, message, receivedAt) {
   switch (message.type) {
     case 'profile': return {
       ...game, account: { member: true, name: message.name }, accountNotice: '',
+      // 가입·복구 때 한 번만 오는 복구 코드. 화면이 보여 주고 사용자가 확인하면 지운다.
+      recoveryCode: message.recoveryCode ?? game.recoveryCode,
+    };
+    case 'recoveryCode': return { ...game, recoveryCode: message.code };
+    case 'dismissRecoveryCode': return { ...game, recoveryCode: null };
+    case 'records': return { ...game, records: { summary: message.summary, recent: message.recent } };
+    case 'accountDeleted': return {
+      ...game, account: null, accountNotice: message.message, records: null, recoveryCode: null,
     };
     case 'guest': return {
       ...game, account: { member: false, name: message.name }, accountNotice: message.notice,
     };
     case 'profileFailed': return { ...game, account: null, accountNotice: message.message };
-    case 'loggedOut': return { ...game, account: null, accountNotice: '' };
+    case 'loggedOut': return { ...game, account: null, accountNotice: '', records: null, recoveryCode: null };
     case 'leaderboard': return { ...game, leaderboard: message.boards };
     case 'state': {
       const sameRoom = game.room?.code === message.code;
@@ -198,6 +215,7 @@ export function useGame() {
   }, []);
 
   const dismissNews = useCallback(() => setGame(game => reduce(game, { type: 'dismissNews' })), []);
+  const dismissRecoveryCode = useCallback(() => setGame(game => reduce(game, { type: 'dismissRecoveryCode' })), []);
 
   useEffect(() => {
     const url = new URL('/ws/lobby', location.href);
@@ -276,7 +294,7 @@ export function useGame() {
           return;
         }
         if (message.type === 'profile' && message.token) saveLoginToken(message.token);
-        if (message.type === 'loggedOut' || message.type === 'guest') saveLoginToken(null);
+        if (message.type === 'loggedOut' || message.type === 'guest' || message.type === 'accountDeleted') saveLoginToken(null);
 
         const pending = legacyCommands.current;
         while (pending.length && receivedAt - pending[0].sentAt >= 15000) pending.shift();
@@ -404,5 +422,5 @@ export function useGame() {
     };
   }, [send]);
 
-  return { game, send, office, dismissNews, voiceSignals };
+  return { game, send, office, dismissNews, dismissRecoveryCode, voiceSignals };
 }
