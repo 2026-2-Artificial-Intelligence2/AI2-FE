@@ -7,7 +7,7 @@ const key = 'office-stock-sound';
 export const SOUND_CHANNELS = ['master', 'effects', 'boss', 'music', 'voice'];
 
 const defaults = {
-  master: 0.8, effects: 1, boss: 1, music: 0.5, voice: 1,
+  master: 0.8, effects: 1, boss: 1, music: 0.8, voice: 1,
   footstepHint: true,   // 컴퓨터 화면에 부장님 발소리 방향 표시
   muted: { master: false, effects: false, boss: false, music: false, voice: false },
 };

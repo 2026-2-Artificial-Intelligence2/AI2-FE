@@ -88,10 +88,17 @@ export function Messenger({ game, send, playing, closing, onDismiss, docked = fa
     style={!docked && size ? { '--window-width': size.width + 'px', '--window-height': size.height + 'px' } : undefined}
     onCancel={docked ? undefined : event => { event.preventDefault(); onDismiss(); }}
     onKeyDown={event => {
-      if (playing && event.key === 'Tab' && !event.shiftKey && !event.ctrlKey && !event.altKey &&
-          !event.metaKey && !event.nativeEvent.isComposing) {
+      const plain = !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey && !event.nativeEvent.isComposing;
+      if (playing && event.key === 'Tab' && plain) {
         event.preventDefault();
         if (!event.repeat) onDismiss(true);
+      }
+      // M으로 열고 M으로 닫는다. 입력 칸에 쓰던 글이 있으면 글자로 들어간다(빈 칸일 때만 닫힘).
+      if (!docked && event.code === 'KeyM' && plain) {
+        const field = event.target.closest?.('input, textarea');
+        if (field && field.value !== '') return;
+        event.preventDefault();
+        if (!event.repeat) onDismiss();
       }
     }}>
     {!docked && <ResizeGrip frame={dialog} label="메신저 창 크기 조절" topLeft onResize={setSize} />}
@@ -100,8 +107,8 @@ export function Messenger({ game, send, playing, closing, onDismiss, docked = fa
         <h2 id="messenger-title" className="text-sm font-bold">사내 메신저</h2>
         <span className="text-xs text-ui-secondary">{me}</span>
       </div>
-      {!docked && <button type="button" aria-label="메신저 닫기" aria-keyshortcuts="Escape" disabled={closing}
-        className="control px-2 py-0.5" onClick={() => onDismiss()}>× <KeyHint>Esc</KeyHint></button>}
+      {!docked && <button type="button" aria-label="메신저 닫기" aria-keyshortcuts="M Escape" disabled={closing}
+        className="control px-2 py-0.5" onClick={() => onDismiss()}>× <KeyHint>M</KeyHint></button>}
     </header>
     <div className="grid min-h-0 flex-1 grid-cols-[clamp(6.5rem,26%,10.5rem)_minmax(0,1fr)]">
       <aside className="overflow-y-auto border-r border-ui-border bg-ui-subtle p-1 sm:p-2">
