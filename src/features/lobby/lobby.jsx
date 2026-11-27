@@ -1,71 +1,131 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { enableSound } from '../../shared/audio/spatial-audio.js';
 
+import { AccountEntry } from './account-entry.jsx';
+import { LeaderboardPanel } from './leaderboard-panel.jsx';
 import officeLanding from './office-landing.webp';
 
 const seats = 4;
+const soloMinutes = [5, 10, 15, 20];
 
-export function Entry({ connected, send, status, createError, joinError }) {
+function SoloDuration({ id, minutes, disabled, onChange }) {
   return (
-    <section aria-labelledby='entry-title' className='panel entry-card'>
-      <img
-        src={officeLanding}
-        className='entry-illustration'
-        alt='옆에 선 부장님을 흘끗 보며 키보드를 누르는 직원'
-        width={1672}
-        height={941}
-      />
-      <div className='entry-controls'>
-        <h2 id='entry-title' className='text-3xl font-extrabold tracking-tight'>
-          사무실 입장
-        </h2>
-        <p className='mt-2 text-sm leading-relaxed text-ui-secondary'>같은 방의 직원들과 퇴근까지 순자산을 겨뤄요.</p>
-        <p id='status' role='status' className='mt-3 text-sm text-ui-secondary'>{status}</p>
-        <button
-          id='create'
-          type='button'
-          disabled={!connected}
-          className='primary-action mt-5 w-full rounded-lg px-4 py-2.5 text-sm font-bold'
-          onClick={() => {
-            enableSound();
-            send('CREATE');
-          }}>
-          방 만들기
-        </button>
-        {createError && <p role='alert' className='mt-2 text-xs text-rose-700 dark:text-rose-300'>{createError}</p>}
-        <form
-          className='mt-5 flex flex-col gap-2 border-t border-ui-border pt-5'
-          onSubmit={(event) => {
-            event.preventDefault();
-            enableSound();
-            send('JOIN ' + new FormData(event.currentTarget).get('code').trim());
-          }}>
-          <label htmlFor='code' className='text-sm font-bold'>
-            초대 코드로 입장
-          </label>
-          <div className='flex items-center gap-2'>
-            <input
-              name='code'
-              id='code'
-              className='field min-w-0 flex-1 font-mono tracking-[0.15em]'
-              maxLength={6}
-              inputMode='numeric'
-              pattern='[0-9]{6}'
-              autoComplete='off'
-              required
-              disabled={!connected}
-              placeholder='6자리 숫자'
-              aria-invalid={joinError ? true : undefined}
-              aria-describedby={joinError ? 'join-error' : undefined}
-            />
-            <button id='join' className='control self-stretch px-4' disabled={!connected}>
-              입장
-            </button>
+    <select id={id} className='field min-w-0' value={minutes} disabled={disabled} onChange={event => onChange(event.target.value)}>
+      {soloMinutes.map(value => <option key={value} value={value}>{value}분</option>)}
+    </select>
+  );
+}
+
+export function Entry({ connected, send, status, account, accountNotice, actionErrors, startingSolo, leaderboard }) {
+  const [mode, setMode] = useState('TEAM');
+  const [minutes, setMinutes] = useState(10);
+  const requested = useRef(false);
+  const ready = connected && Boolean(account);
+  const createError = actionErrors.CREATE?.message;
+  const joinError = actionErrors.JOIN?.message;
+
+  // 첫 화면에 들어오면 명예의 전당을 한 번 불러온다(연결이 다시 맺어지면 다시).
+  useEffect(() => {
+    if (!connected) { requested.current = false; return; }
+    if (!requested.current && !leaderboard) requested.current = send('LEADERBOARD');
+  }, [connected, leaderboard, send]);
+
+  return (
+    <div className='entry-page'>
+      <section aria-labelledby='entry-title' className='panel entry-card'>
+        <img src={officeLanding} className='entry-illustration' alt='옆에 선 부장님을 흘끗 보며 키보드를 누르는 직원' width={1672} height={941} />
+        <div className='entry-controls space-y-5'>
+          <div>
+            <h2 id='entry-title' className='text-3xl font-extrabold tracking-tight'>사무실 입장</h2>
+            <p className='mt-2 text-sm leading-relaxed text-ui-secondary'>부장님 몰래 주식으로 퇴근 전까지 순자산을 불려요.</p>
+            {status && <p id='status' role='status' className='mt-2 text-xs text-ui-secondary'>{status}</p>}
           </div>
-          {joinError && <p id='join-error' role='alert' className='text-xs text-rose-700 dark:text-rose-300'>{joinError}</p>}
-        </form>
-      </div>
-    </section>
+
+          <AccountEntry account={account} notice={accountNotice} actionErrors={actionErrors} connected={connected} send={send} />
+
+          <section aria-labelledby='play-title' className={'space-y-3 transition-opacity ' + (ready ? '' : 'opacity-60')}>
+            <div className='flex items-center justify-between gap-2'>
+              <h3 id='play-title' className='text-sm font-bold'>어떻게 할까요?</h3>
+              {!account && <p className='text-xs text-ui-secondary'>먼저 이름을 정해 주세요</p>}
+            </div>
+            <div role='tablist' aria-label='플레이 방식' className='grid grid-cols-2 gap-2'>
+              {[
+                { id: 'TEAM', title: '함께 하기', sub: '친구 2~4명' },
+                { id: 'SOLO', title: '혼자 하기', sub: '1인 · 명예의 전당' },
+              ].map(item => <button key={item.id} type='button' role='tab' aria-selected={mode === item.id}
+                className={'rounded-xl border px-3 py-2.5 text-left transition-colors ' + (mode === item.id
+                  ? 'border-indigo-600 bg-indigo-50 ring-1 ring-indigo-600 dark:border-indigo-400 dark:bg-[var(--dark-selection)] dark:ring-indigo-400'
+                  : 'border-ui-border hover:bg-ui-subtle')}
+                onClick={() => setMode(item.id)}>
+                <span className='block text-sm font-bold'>{item.title}</span>
+                <span className='block text-xs text-ui-secondary'>{item.sub}</span>
+              </button>)}
+            </div>
+
+            {mode === 'TEAM' ? <div role='tabpanel' aria-label='함께 하기' className='space-y-3'>
+              <button id='create' type='button' disabled={!ready}
+                className='primary-action w-full rounded-lg px-4 py-2.5 text-sm font-bold'
+                onClick={() => { enableSound(); send('CREATE'); }}>
+                방 만들기
+              </button>
+              {createError && <p role='alert' className='text-xs text-rose-700 dark:text-rose-300'>{createError}</p>}
+              <div className='flex items-center gap-2 text-[11px] text-ui-caption' aria-hidden='true'>
+                <span className='h-px flex-1 bg-ui-border' />또는 초대 코드로<span className='h-px flex-1 bg-ui-border' />
+              </div>
+              <form className='flex items-center gap-2'
+                onSubmit={event => {
+                  event.preventDefault();
+                  enableSound();
+                  send('JOIN ' + new FormData(event.currentTarget).get('code').trim());
+                }}>
+                <label htmlFor='code' className='sr-only'>초대 코드</label>
+                <input name='code' id='code' className='field min-w-0 flex-1 text-center font-mono tracking-[0.3em]'
+                  maxLength={6} inputMode='numeric' pattern='[0-9]{6}' autoComplete='off' required disabled={!ready}
+                  placeholder='000000' aria-invalid={joinError ? true : undefined}
+                  aria-describedby={joinError ? 'join-error' : undefined} />
+                <button id='join' className='control self-stretch px-4' disabled={!ready}>입장</button>
+              </form>
+              {joinError && <p id='join-error' role='alert' className='text-xs text-rose-700 dark:text-rose-300'>{joinError}</p>}
+            </div>
+              : <form role='tabpanel' aria-label='혼자 하기' className='space-y-3'
+                onSubmit={event => {
+                  event.preventDefault();
+                  if (!ready) return;
+                  enableSound();
+                  send('SOLO ' + minutes);
+                }}>
+                <div className='space-y-1'>
+                  <p id='solo-minutes-label' className='text-xs font-semibold text-ui-secondary'>근무 시간</p>
+                  <div role='group' aria-labelledby='solo-minutes-label' className='segments grid w-full grid-cols-4'>
+                    {soloMinutes.map(value => <button key={value} type='button' aria-pressed={minutes === value}
+                      disabled={!ready} onClick={() => setMinutes(value)}>{value}분</button>)}
+                  </div>
+                </div>
+                <button id='solo-start' type='submit' disabled={!ready}
+                  className='primary-action w-full rounded-lg px-4 py-2.5 text-sm font-bold'>
+                  {startingSolo ? '출근하는 중…' : minutes + '분 혼자 출근하기'}
+                </button>
+                {actionErrors.SOLO && <p role='alert' className='text-xs text-rose-700 dark:text-rose-300'>{actionErrors.SOLO.message}</p>}
+                {(() => {
+                  const top = leaderboard?.find(board => board.minutes === minutes)?.entries[0];
+                  return top && <p className='rounded-lg bg-ui-subtle px-3 py-2 text-xs text-ui-secondary'>
+                    {minutes}분 1위 <b className='text-ui-text'>{top.name}</b>{' '}
+                    <b className='tabular-nums text-rose-700 dark:text-rose-300'>{(top.bestReturnPercent > 0 ? '+' : '') + top.bestReturnPercent.toFixed(2)}%</b>
+                    {' '}· 이 기록을 넘어 보세요!
+                  </p>;
+                })()}
+                <p className='text-xs text-ui-secondary'>
+                  {account?.member ? '기록이 ' + minutes + '분 명예의 전당에 올라가요.' : '게스트 기록은 명예의 전당에 오르지 않아요.'}
+                </p>
+              </form>}
+          </section>
+        </div>
+      </section>
+
+      <LeaderboardPanel durations={soloMinutes} minutes={minutes} onMinutes={setMinutes} boards={leaderboard}
+        me={account?.member ? account.name : null} connected={connected} error={actionErrors.LEADERBOARD?.message}
+        onRetry={() => send('LEADERBOARD')} />
+    </div>
   );
 }
 
@@ -127,7 +187,11 @@ function Players({ members, you }) {
               key={member?.label ?? 'empty-' + index}
               className={
                 'flex min-h-22 items-center gap-3 rounded-lg border p-3 min-[45rem]:min-h-21 ' +
-                (mine ? 'border-indigo-200 dark:border-indigo-800 bg-indigo-50/60 dark:bg-[var(--dark-selection)]' : member ? 'border-ui-border bg-ui-surface' : 'border-dashed border-ui-input bg-ui-subtle')
+                (mine
+                  ? 'border-indigo-200 dark:border-indigo-800 bg-indigo-50/60 dark:bg-[var(--dark-selection)]'
+                  : member
+                    ? 'border-ui-border bg-ui-surface'
+                    : 'border-dashed border-ui-input bg-ui-subtle')
               }>
               <span
                 aria-hidden='true'
@@ -142,6 +206,9 @@ function Players({ members, you }) {
                       {mine && ' (나)'}
                     </span>
                     {member.host && <span className='rounded bg-indigo-100 dark:bg-indigo-900 px-1.5 py-0.5 text-[11px] font-semibold text-indigo-900 dark:text-indigo-200'>방장</span>}
+                    <span className={'rounded px-1.5 py-0.5 text-[11px] font-semibold ' + (member.member
+                      ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200'
+                      : 'bg-ui-muted text-ui-secondary')}>{member.member ? '회원' : '게스트'}</span>
                   </div>
                   <p className={'mt-1 text-xs ' + (member.online ? 'text-ui-secondary' : 'font-medium text-amber-800 dark:text-amber-200')}>{member.online ? '접속 중' : '연결 끊김'}</p>
                 </div>
@@ -162,10 +229,10 @@ function durationText(seconds) {
   return [minutes ? minutes + '분' : '', rest ? rest + '초' : ''].filter(Boolean).join(' ');
 }
 
-function RoomSettings({ sessionSeconds, host, connected, lengthError, startError, canStart, send }) {
+function RoomSettings({ sessionSeconds, host, connected, lengthError, startError, canStart, solo, send }) {
   const [minutes, setMinutes] = useState(String(Math.ceil(sessionSeconds / 60)));
   const [request, setRequest] = useState(null);
-  const valid = /^\d+$/.test(minutes) && Number(minutes) >= 1 && Number(minutes) <= 60;
+  const valid = solo ? soloMinutes.includes(Number(minutes)) : /^\d+$/.test(minutes) && Number(minutes) >= 1 && Number(minutes) <= 60;
   const requestedSeconds = Number(minutes) * 60;
   const pending = connected && request && request.seconds !== sessionSeconds && !lengthError;
   const changed = requestedSeconds !== sessionSeconds;
@@ -191,10 +258,11 @@ function RoomSettings({ sessionSeconds, host, connected, lengthError, startError
               if (send('LENGTH ' + Number(minutes))) setRequest({ seconds: requestedSeconds });
             }}>
             <label className='block text-sm font-semibold' htmlFor='room-minutes'>
-              근무 시간 변경 (1~60분)
+              {solo ? '근무 시간 변경' : '근무 시간 변경 (1~60분)'}
             </label>
             <div className='flex gap-2'>
-              <input
+              {solo ? <SoloDuration id='room-minutes' minutes={minutes} disabled={!connected || Boolean(pending)} onChange={setMinutes} />
+                : <input
                 id='room-minutes'
                 type='number'
                 min='1'
@@ -205,12 +273,16 @@ function RoomSettings({ sessionSeconds, host, connected, lengthError, startError
                 className='field min-w-0 flex-1'
                 value={minutes}
                 onChange={(event) => setMinutes(event.target.value)}
-              />
+              />}
               <button className='control' disabled={!connected || !valid || !changed || Boolean(pending)}>
                 {pending ? '적용 중…' : '적용'}
               </button>
             </div>
-            {lengthError && <p role='alert' className='text-xs text-rose-700 dark:text-rose-300'>{lengthError}</p>}
+            {lengthError && (
+              <p role='alert' className='text-xs text-rose-700 dark:text-rose-300'>
+                {lengthError}
+              </p>
+            )}
           </form>
           <div className='space-y-2 border-t border-ui-border pt-4'>
             <button
@@ -221,9 +293,13 @@ function RoomSettings({ sessionSeconds, host, connected, lengthError, startError
                 enableSound();
                 send('START');
               }}>
-              게임 시작
+              {solo ? '혼자 하기' : '게임 시작'}
             </button>
-            {startError && <p role='alert' className='text-xs text-rose-700 dark:text-rose-300'>{startError}</p>}
+            {startError && (
+              <p role='alert' className='text-xs text-rose-700 dark:text-rose-300'>
+                {startError}
+              </p>
+            )}
             {!canStart && <p className='text-xs text-ui-secondary'>두 명 이상 모이면 시작할 수 있어요.</p>}
           </div>
         </>
@@ -237,21 +313,21 @@ function RoomSettings({ sessionSeconds, host, connected, lengthError, startError
 export function Lobby({ game, host, send, messenger }) {
   const { room, connected, status, actionErrors } = game;
   return (
-    <section id='lobby' className='lobby-shell min-w-0' aria-labelledby='lobby-title'>
+    <section id='lobby' className={room.solo ? 'mx-auto max-w-2xl' : 'lobby-shell min-w-0'} aria-labelledby='lobby-title'>
       <div className='min-w-0 space-y-3'>
         <header className='panel bg-ui-muted flex flex-wrap items-center justify-between gap-5 p-5 sm:px-7'>
           <div>
             <h2 id='lobby-title' className='text-xl font-extrabold'>
-              대기실
+              {room.solo ? '혼자 하기 대기실' : '대기실'}
             </h2>
             <p id='status' role='status' className='mt-1 text-sm text-ui-secondary'>
               {status || actionErrors.GENERAL?.message || (room.round > 1 ? room.round + '번째 판 · 시작 대기 중' : '시작 대기 중')}
             </p>
           </div>
-          <InviteCode code={room.code} />
+          {!room.solo && <InviteCode code={room.code} />}
         </header>
-        <div className={'lobby-grid' + (host ? '' : ' lobby-grid--guest')}>
-          <Players members={room.members ?? []} you={room.youLabel} />
+        <div className={room.solo ? undefined : 'lobby-grid' + (host ? '' : ' lobby-grid--guest')}>
+          {!room.solo && <Players members={room.members ?? []} you={room.youLabel} />}
           <RoomSettings
             key={room.sessionSeconds + '-' + connected}
             sessionSeconds={room.sessionSeconds}
@@ -259,7 +335,8 @@ export function Lobby({ game, host, send, messenger }) {
             connected={connected}
             lengthError={actionErrors.LENGTH?.message}
             startError={actionErrors.START?.message}
-            canStart={room.room.players.length >= 2}
+            canStart={room.solo || room.room.players.length >= 2}
+            solo={room.solo}
             send={send}
           />
         </div>

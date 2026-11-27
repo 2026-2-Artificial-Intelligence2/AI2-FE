@@ -87,7 +87,7 @@ function Account({ game, name, active, send }) {
   </section>;
 }
 
-export function Market({ visible, active, game, name, send, gauges, theme }) {
+export function Market({ visible, active, game, name, send, gauges, loanAction, theme }) {
   const [selected, setSelected] = useState('');
   const [sortBy, setSortBy] = useState('rate');
   const frame = useRef(null);
@@ -95,10 +95,13 @@ export function Market({ visible, active, game, name, send, gauges, theme }) {
   const [mode, setMode] = useState('MARKET');
   const [limit, setLimit] = useState('');
   const { market, candles } = game;
+  const catalogById = new Map(game.stocks.map(stock => [stock.id, stock]));
   const listedStocks = Object.entries(market.prices).map(([id, price]) => {
     const opening = openingPrice(candles[id]);
     const change = opening > 0 ? price - opening : null;
-    return { id, label: name(id), price, change, rate: change === null ? null : 100 * change / opening };
+    const sector = catalogById.get(id)?.sector;
+    const subtitle = sector ? `${id} · ${sector}` : id;
+    return { id, label: name(id), subtitle, price, change, rate: change === null ? null : 100 * change / opening };
   });
   listedStocks.sort((a, b) => {
     if (sortBy === 'rate' && a.rate !== b.rate) {
@@ -119,9 +122,9 @@ export function Market({ visible, active, game, name, send, gauges, theme }) {
   }, [visible, symbol, selected]);
 
   if (!visible || !selectedStock) return null;
-  const { price, change, rate } = selectedStock;
+  const { price, change, rate, subtitle } = selectedStock;
   const series = candles[symbol] ?? [];
-  const stock = game.stocks.find(stock => stock.id === symbol);
+  const stock = catalogById.get(symbol);
   const news = (game.history ?? []).filter(item => item.symbols?.some(id => id === symbol || id === stock?.underlying));
   function select(id) {
     setSelected(id);
@@ -134,10 +137,10 @@ export function Market({ visible, active, game, name, send, gauges, theme }) {
     <div className="market-content min-h-0 flex-1 space-y-3 overflow-y-auto pb-1">
       <div className="market-layout grid items-start gap-3">
         <div className="market-main min-w-0 space-y-3">
-          <section className="panel flex flex-wrap items-center justify-between gap-4 p-5">
-            <div>
-              <div className="mb-2 flex items-center gap-2"><h2 className="text-lg font-bold">{name(symbol)}</h2>
-                <span className="text-xs font-semibold tracking-wide text-ui-caption">{symbol}</span></div>
+          <header className="panel game-section-header p-5">
+            <div className="min-w-0">
+              <div className="mb-2 flex flex-wrap items-baseline gap-x-2 gap-y-1"><h2 className="text-lg font-bold">{name(symbol)}</h2>
+                <span className="text-xs font-semibold tracking-wide text-ui-caption">{subtitle}</span></div>
               <div className="flex flex-wrap items-baseline gap-x-3">
                 <p className="text-4xl font-extrabold tracking-tight tabular-nums">{won(price)}</p>
                 {change !== null && <p className={'text-sm font-semibold tabular-nums ' + movement(change)}>
@@ -146,8 +149,9 @@ export function Market({ visible, active, game, name, send, gauges, theme }) {
                 </p>}
               </div>
             </div>
+            {loanAction}
             {gauges}
-          </section>
+          </header>
           <div className="market-grid grid items-start gap-3">
             <div className="market-chart min-w-0"><PriceChart key={symbol} candles={series}
               seconds={game.candleSeconds ?? 10} theme={theme} price={price} name={name(symbol)} /></div>
@@ -176,13 +180,13 @@ export function Market({ visible, active, game, name, send, gauges, theme }) {
             </select>
           </div>
           <ul className="max-h-72 overflow-y-auto min-[900px]:max-h-[70vh]">
-            {listedStocks.map(({ id, label, price: latest, rate }) =>
+            {listedStocks.map(({ id, label, subtitle, price: latest, rate }) =>
               <li key={id}><button type="button" aria-pressed={id === symbol}
                 className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-2 rounded-md px-2 py-2 text-left text-xs hover:bg-ui-muted aria-pressed:bg-blue-50 dark:aria-pressed:bg-[var(--dark-selection)]"
                 onClick={() => select(id)}>
                 <span className="truncate font-semibold">{label}</span>
                 <span className={'text-right font-semibold tabular-nums ' + movement(rate)}>{rate === null ? '–' : percent(rate)}</span>
-                <span className="text-ui-caption">{id}</span><span className="text-right tabular-nums">{won(latest)}</span>
+                <span className="truncate text-ui-caption" title={subtitle}>{subtitle}</span><span className="text-right tabular-nums">{won(latest)}</span>
               </button></li>)}
           </ul>
         </aside>

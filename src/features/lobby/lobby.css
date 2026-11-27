@@ -1,9 +1,15 @@
-.entry-card {
+.entry-page {
   display: grid;
+  gap: 1rem;
   inline-size: 100%;
   max-inline-size: 70rem;
   margin-inline: auto;
-  margin-block-start: clamp(1.5rem, 10vh, 7rem);
+  margin-block-start: clamp(0.75rem, 3vh, 2rem);
+}
+
+.entry-card {
+  display: grid;
+  inline-size: 100%;
   overflow: hidden;
 }
 
@@ -55,7 +61,7 @@
 
 @media (min-width: 52rem) {
   .entry-card {
-    grid-template-columns: minmax(0, 1.8fr) minmax(19rem, 1fr);
+    grid-template-columns: minmax(0, 1.5fr) minmax(21rem, 1fr);
   }
 }
 

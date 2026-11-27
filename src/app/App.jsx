@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useGame } from './use-game.js';
 import { useTheme } from './use-theme.js';
-import { MicrophonePermission, useMicrophonePreference } from './microphone-permission.jsx';
-import { useMicrophone } from './use-microphone.js';
 import { useVoice } from './use-voice.js';
 import { VoicePanel } from './voice-panel.jsx';
 import { GameGauges } from './game-gauges.jsx';
@@ -20,10 +18,11 @@ import { Notifications } from './notifications.jsx';
 import { OfficeViewport } from '../features/office/office-viewport.jsx';
 import { KeyHint, useShortcuts } from '../shared/ui/shortcuts.jsx';
 
+const headerControl = 'control min-h-11 shrink-0 whitespace-nowrap px-2.5 sm:min-h-0 sm:px-3';
+
 export function App() {
   const { game, send, office, dismissNews, voiceSignals } = useGame();
   const { theme, toggleTheme } = useTheme();
-  const { choiceNeeded, choose } = useMicrophonePreference();
   const [inbox, setInbox] = useState(false);
   const [activeDialog, setActiveDialog] = useState(null);
   const [conversation, setConversation] = useState('ALL');
@@ -35,14 +34,8 @@ export function App() {
   const [monitorVisible, setMonitorVisible] = useState(false);
   const [lastChat, setLastChat] = useState(0);
   const [lastNews, setLastNews] = useState(0);
-  const { connected, room, view, market, desk, result, actionErrors } = game;
-  const microphone = useMicrophone({ connected, roomCode: room?.code, send });
+  const { connected, room, view, market, desk, result, actionErrors, startingSolo } = game;
   const voice = useVoice({ game, send, signals: voiceSignals });
-  // 휴대폰 브라우저는 마이크를 한 번에 하나만 쓸 수 있다. 소리 크기용 마이크를 또 잡으면 음성 대화 마이크가 무음이 되므로,
-  // 음성에 참여하면 소리 크기용 마이크는 끄고 음성 마이크로 소리 크기를 함께 보낸다.
-  useEffect(() => {
-    if (voice.joined && microphone.status !== 'off') microphone.stop(false);
-  }, [voice.joined, microphone]);
   // 개발 서버에서만: 마이크 대신 합성음 등으로 음성 대화를 시험할 때 콘솔에서 쓴다(window.officeVoice.join(stream)).
   useEffect(() => {
     if (import.meta.env.DEV) window.officeVoice = voice;
@@ -50,15 +43,17 @@ export function App() {
   const seated = view === 'WORK' || view === 'MARKET';
   const messaging = view === 'MESSENGER';
   const computer = seated || messaging;
-  const inLobby = Boolean(room && !room.room.startedAt);
+  const solo = Boolean(room?.solo);
+  const inLobby = Boolean(room && !room.room.startedAt && !startingSolo);
   const outsideRound = Boolean(room && (inLobby || result));
-  const canOpenMessengerPopup = outsideRound && !inLobby;
-  const messengerOpen = inLobby || messaging || Boolean(returning) || (canOpenMessengerPopup && lobbyMessenger);
+  const canOpenMessengerPopup = !solo && outsideRound && !inLobby;
+  const messengerOpen = !solo && (inLobby || messaging || Boolean(returning) || (canOpenMessengerPopup && lobbyMessenger));
   const desktopView = messaging || returning ? underMessenger : view;
   const officeActive = computer && Boolean(office.current);
   const desktopShown = !officeActive || officeReady === false || (!looking && monitorVisible);
   const desktopInteractive = desktopShown && view !== 'MEETING';
   const showLoan = computer && game.loan && desk && !result;
+  const closingSoon = market?.remainingSeconds <= 120;
   const host = room?.you === room?.room.hostId;
   const name = symbol => game.stocks.find(stock => stock.id === symbol)?.name ?? symbol;
 
@@ -109,6 +104,7 @@ export function App() {
   }
 
   function openMessenger(target) {
+    if (solo) return;
     setConversation(typeof target === 'string' ? target : 'ALL');
     if (canOpenMessengerPopup) {
       setLobbyMessenger(true);
@@ -125,7 +121,7 @@ export function App() {
     }
     if (returning) return;
     if (send('SWITCH') && underMessenger === 'MARKET' && !goToWork) {
-      setReturning({ waitingFor: 'WORK', error: game.lastError });
+      setReturning({ waitingFor: 'WORK', error: game.lastViewError });
     }
   }
 
@@ -135,14 +131,14 @@ export function App() {
 
   useEffect(() => {
     if (!returning) return;
-    if (!connected || !computer || game.lastError !== returning.error || view === 'MARKET') {
+    if (!connected || !computer || game.lastViewError !== returning.error || view === 'MARKET') {
       setReturning(null);
     } else if (view === 'WORK' && returning.waitingFor === 'WORK') {
       // 서버의 SWITCH는 메신저에서 업무로 돌아온 뒤에만 주식 창을 열 수 있다.
       if (send('SWITCH')) setReturning({ ...returning, waitingFor: 'MARKET' });
       else setReturning(null);
     }
-  }, [returning, connected, computer, view, send, game.lastError]);
+  }, [returning, connected, computer, view, send, game.lastViewError]);
 
   function toggleInbox() {
     setInbox(open => !open);
@@ -151,7 +147,7 @@ export function App() {
   useShortcuts(connected && (computer || outsideRound), {
     Tab: computer && (desktopInteractive || looking) ? switchView : undefined,
     KeyQ: seated && officeReady ? lookAround : undefined,
-    KeyM: (seated && desktopInteractive) || canOpenMessengerPopup ? openMessenger : undefined,
+    KeyM: !solo && ((seated && desktopInteractive) || canOpenMessengerPopup) ? openMessenger : undefined,
     KeyN: computer && desktopInteractive ? toggleInbox : undefined,
     Escape: looking ? returnToMonitor : inbox ? () => setInbox(false) : undefined,
   });
@@ -170,7 +166,11 @@ export function App() {
     setLooking(false);
   }
 
-  const gauges = <GameGauges game={game} microphone={microphone} voiceJoined={voice.joined} />;
+  const loanAction = showLoan && <button type="button" className="control game-loan-action whitespace-nowrap"
+    aria-haspopup="dialog" disabled={!connected} onClick={() => setActiveDialog('loan')}>
+    {desk.balance.loanRepayWon > 0 ? '대출 내역' : '비상 대출'}
+  </button>;
+  const gauges = <GameGauges game={game} />;
   const messenger = room && messengerOpen && <Messenger key={'messenger-' + room.code + '-' + room.round} game={game}
     send={send} initialChannel={conversation} docked={inLobby} playing={!outsideRound} closing={Boolean(returning)} onDismiss={closeMessenger} />;
 
@@ -182,48 +182,47 @@ export function App() {
     <main inert={!desktopInteractive} data-monitor={desktopShown}
       className={(officeActive ? 'game-desktop ' : '') + 'min-h-screen'}>
       <div className="mx-auto max-w-[1520px] space-y-4 px-4 py-5 sm:px-7">
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-ui-border pb-4">
+        <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 border-b border-ui-border pb-4 sm:flex sm:flex-wrap">
           <h1 className="text-lg font-extrabold tracking-tight">부장님 몰래</h1>
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <button type="button" className="control" aria-label="다크 모드" aria-pressed={theme === 'dark'}
-              onClick={toggleTheme}>
-              <span aria-hidden="true">{theme === 'dark' ? '☀ 라이트 모드' : '☾ 다크 모드'}</span>
+          <div className="flex items-center gap-2 text-sm sm:ml-auto">
+            <button type="button" className="control grid size-11 place-items-center p-0 text-base sm:block sm:size-auto sm:px-3 sm:py-1.5 sm:text-sm"
+              aria-label="다크 모드" aria-pressed={theme === 'dark'} onClick={toggleTheme}>
+              <span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span>
+              <span aria-hidden="true" className="hidden sm:inline">{theme === 'dark' ? ' 라이트 모드' : ' 다크 모드'}</span>
             </button>
-            {room && <>
-              <VoicePanel voice={voice} connected={connected} />
-              {(market && !result || showLoan) && <div className="flex flex-wrap items-center gap-2">
-                {market && !result && <span id="clock" className="tabular-nums">퇴근까지 <b>{clock(market.remainingSeconds)}</b>
-                  {market.remainingSeconds <= 120 && <span className="ml-2 text-rose-700 dark:text-rose-300">장 마감 임박</span>}</span>}
-                {showLoan && <button type="button" className="control" aria-haspopup="dialog" disabled={!connected}
-                  onClick={() => setActiveDialog('loan')}>{desk.balance.loanRepayWon > 0 ? '대출 내역' : '비상 대출'}</button>}
-              </div>}
-              {canOpenMessengerPopup && <button className="control" disabled={!connected} aria-haspopup="dialog"
-                aria-keyshortcuts="M" onClick={openMessenger}>메신저 <KeyHint>M</KeyHint></button>}
-              {computer && <>
-                {seated && <>
-                  <button className="control" id="look" disabled={!connected || !officeReady} aria-keyshortcuts="Q" onClick={lookAround}>주변 보기 <KeyHint>Q</KeyHint></button>
-                </>}
-                <button className="control" id="switchView" disabled={!connected} aria-keyshortcuts="Tab" onClick={switchView}>
-                  {view === 'WORK' ? '주식으로' : '업무로'} <KeyHint>Tab</KeyHint>
-                </button>
-              </>}
-              <button type="button" className="control" aria-haspopup="dialog" disabled={!connected}
-                onClick={() => setActiveDialog('leave')}>나가기</button>
-            </>}
+            {room && !solo && <VoicePanel voice={voice} connected={connected} serverError={actionErrors.VOICE?.message} />}
           </div>
-        </header>
-        {room && !inLobby && (game.status || actionErrors.GENERAL || (!activeDialog && game.notice)) &&
-          <div role="status" className="panel px-4 py-3 text-sm text-ui-secondary">
-            {game.status || actionErrors.GENERAL?.message || game.notice?.message}
+          {room && !startingSolo && <div className="col-span-full flex min-w-0 items-center gap-1.5 text-sm sm:flex-wrap sm:gap-2">
+            {market && !result && <span id="clock" className="flex shrink-0 flex-col leading-tight tabular-nums sm:flex-row sm:items-center sm:gap-1">
+              <span className="text-xs text-ui-secondary sm:text-sm sm:text-ui-text">퇴근까지</span>
+              <b className={closingSoon ? 'text-rose-700 dark:text-rose-300 sm:text-ui-text' : undefined}>{clock(market.remainingSeconds)}</b>
+              {closingSoon && <span className="sr-only text-rose-700 sm:not-sr-only sm:ml-1 dark:text-rose-300">장 마감 임박</span>}
+            </span>}
+            {canOpenMessengerPopup && <button className={headerControl} disabled={!connected} aria-haspopup="dialog"
+              aria-keyshortcuts="M" onClick={openMessenger}>메신저<span className="hidden sm:inline"><KeyHint>M</KeyHint></span></button>}
+            {computer && <>
+              {seated && <button className={headerControl} id="look" disabled={!connected || !officeReady}
+                aria-keyshortcuts="Q" onClick={lookAround}>주변 보기<span className="hidden lg:inline"><KeyHint>Q</KeyHint></span></button>}
+              <button className={headerControl} id="switchView" disabled={!connected} aria-keyshortcuts="Tab" onClick={switchView}>
+                {view === 'WORK' ? '주식으로' : '업무로'}<span className="hidden lg:inline"><KeyHint>Tab</KeyHint></span>
+              </button>
+            </>}
+            <button type="button" className={headerControl + ' ml-auto sm:ml-0'} aria-haspopup="dialog" disabled={!connected}
+              onClick={() => setActiveDialog('leave')}>나가기</button>
           </div>}
-        {!room && <Entry connected={connected} send={send} status={game.status}
-          createError={actionErrors.CREATE?.message} joinError={actionErrors.JOIN?.message} />}
-        {!room && choiceNeeded && <MicrophonePermission onChoose={choose} />}
+        </header>
+        {room && !startingSolo && !inLobby && (game.status || actionErrors.VIEW || actionErrors.GENERAL || (!activeDialog && game.notice)) &&
+          <div role="status" className="panel px-4 py-3 text-sm text-ui-secondary">
+            {game.status || actionErrors.VIEW?.message || actionErrors.GENERAL?.message || game.notice?.message}
+          </div>}
+        {(!room || startingSolo) && <Entry connected={connected && !startingSolo} send={send} status={game.status}
+          account={game.account} accountNotice={game.accountNotice} actionErrors={actionErrors} startingSolo={startingSolo}
+          leaderboard={game.leaderboard} />}
         {inLobby && <Lobby key={'lobby-' + room.code + '-' + room.round} game={game} host={host} send={send}
           messenger={messenger} />}
-        {desk && !result && <Work game={game} visible={desktopView === 'WORK'} active={desktopInteractive && view === 'WORK' && !messengerOpen} gauges={gauges} send={send} />}
-        {market && !result && <Market visible={desktopView === 'MARKET'} active={desktopInteractive && !messengerOpen && view === 'MARKET'} game={game} name={name} gauges={gauges} theme={theme} send={send} />}
-        {result && <Results result={result} name={name} host={host} connected={connected} send={send} restartError={actionErrors.RESTART?.message} />}
+        {desk && !result && <Work game={game} visible={desktopView === 'WORK'} active={desktopInteractive && view === 'WORK' && !messengerOpen} gauges={gauges} loanAction={loanAction} send={send} />}
+        {market && !result && <Market visible={desktopView === 'MARKET'} active={desktopInteractive && !messengerOpen && view === 'MARKET'} game={game} name={name} gauges={gauges} loanAction={loanAction} theme={theme} send={send} />}
+        {result && <Results result={result} name={name} host={host} solo={solo} connected={connected} send={send} restartError={actionErrors.RESTART?.message} />}
         {!inLobby && messenger}
         {computer && desktopShown && <Notifications game={game} inbox={inbox} toggleInbox={toggleInbox}
           messengerOpen={messengerOpen} openMessenger={openMessenger} lastChat={lastChat} lastNews={lastNews} dismissNews={dismissNews} />}
