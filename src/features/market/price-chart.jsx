@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { clock, number } from '../../shared/format.js';
+import { Icon, faChevronLeft, faChevronRight } from '../../shared/ui/icon.jsx';
 
 const chartColors = {
   light: {
@@ -128,8 +129,8 @@ export function PriceChart({ candles, seconds, price, name, theme = 'light' }) {
     <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3">
       <h3 className="font-bold">가격 차트 <span className="ml-1 text-xs font-normal text-ui-caption">{seconds}초봉</span></h3>
       <div className="segments" aria-label="차트 조작">
-        <button type="button" aria-label="이전 봉" onClick={() => pan(end - Math.ceil(count / 3))}>◀</button>
-        <button type="button" aria-label="다음 봉" onClick={() => pan(end + Math.ceil(count / 3))}>▶</button>
+        <button type="button" aria-label="이전 봉" onClick={() => pan(end - Math.ceil(count / 3))}><Icon icon={faChevronLeft} /></button>
+        <button type="button" aria-label="다음 봉" onClick={() => pan(end + Math.ceil(count / 3))}><Icon icon={faChevronRight} /></button>
         <button type="button" aria-label="차트 축소" onClick={() => zoom(1)}>−</button>
         <button type="button" aria-label="차트 확대" onClick={() => zoom(-1)}>+</button>
         <button type="button" aria-pressed={!historical} onClick={() => setView(current => ({ ...current, end: null }))}>실시간</button>

@@ -2,6 +2,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { clock } from '../../shared/format.js';
 import { KeyHint } from '../../shared/ui/shortcuts.jsx';
 import { ResizeGrip, useWindowSize } from '../../shared/ui/window-resize.jsx';
+import { Icon, faBullhorn } from '../../shared/ui/icon.jsx';
 
 const group = 'ALL';
 const rumor = 'LEAK';
@@ -127,7 +128,7 @@ export function Messenger({ game, send, playing, closing, onDismiss, docked = fa
           {messages.length ? messages.map(message => {
             if (message.system) return <p key={message.id} role="note"
               className="mx-auto max-w-[95%] rounded-full bg-amber-100 px-3 py-1 text-center text-xs font-semibold text-amber-950 dark:bg-amber-950 dark:text-amber-100">
-              📢 {message.text}{message.second >= 0 && <span className="ml-1.5 font-normal tabular-nums opacity-70">{clock(message.second)}</span>}
+              <Icon icon={faBullhorn} className="mr-1.5" />{message.text}{message.second >= 0 && <span className="ml-1.5 font-normal tabular-nums opacity-70">{clock(message.second)}</span>}
             </p>;
             const mine = message.from === me;
             return <article key={message.id} className={mine ? 'max-w-[90%] self-end text-right' : 'max-w-[90%] self-start'}>

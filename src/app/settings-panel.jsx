@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { previewSound } from '../shared/audio/spatial-audio.js';
 import { updateSound, useSoundSettings } from '../shared/sound-settings.js';
+import { Icon, faGear, faMoon, faSun, faVolumeHigh, faVolumeXmark } from '../shared/ui/icon.jsx';
 
 const channels = [
   { id: 'master', label: '전체 음량', hint: '모든 소리' },
+  { id: 'music', label: '배경음악', hint: '근무 중 사무실 음악' },
   { id: 'effects', label: '효과음', hint: '체결·알림·업무·정산' },
   { id: 'boss', label: '부장님 소리', hint: '발소리·헛기침·문 소리' },
-  { id: 'music', label: '배경음악', hint: '근무 중 사무실 음악' },
   { id: 'voice', label: '음성 채팅', hint: '동료 목소리 전체' },
 ];
 
@@ -36,7 +37,7 @@ function VolumeRow({ channel, settings, preview }) {
       <button type="button" className="control grid size-8 shrink-0 place-items-center p-0" aria-pressed={muted}
         aria-label={channel.label + (muted ? ' 음소거 해제' : ' 음소거')}
         onClick={() => updateSound({ muted: { [channel.id]: !muted } })}>
-        <span aria-hidden="true">{muted ? '🔇' : '🔊'}</span>
+        <Icon icon={muted ? faVolumeXmark : faVolumeHigh} className="text-xs" />
       </button>
       <input id={inputId} type="range" min="0" max="1" step="0.05" value={settings[channel.id]}
         className="w-full disabled:opacity-40" disabled={muted}
@@ -70,7 +71,7 @@ export function SettingsPanel({ theme, onToggleTheme }) {
   return <div ref={box} className="relative">
     <button type="button" id="settings" className="control grid size-11 place-items-center p-0 text-base sm:flex sm:size-auto sm:items-center sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-sm"
       aria-haspopup="dialog" aria-expanded={open} aria-label="설정" onClick={() => setOpen(value => !value)}>
-      <span aria-hidden="true">⚙</span>
+      <Icon icon={faGear} />
       <span aria-hidden="true" className="hidden sm:inline">설정</span>
     </button>
 
@@ -79,8 +80,8 @@ export function SettingsPanel({ theme, onToggleTheme }) {
       <section className="space-y-2" aria-labelledby="settings-screen">
         <h2 id="settings-screen" className="text-xs font-bold text-ui-secondary">화면</h2>
         <div className="segments w-full" aria-label="화면 테마">
-          <button type="button" className="flex-1" aria-pressed={theme !== 'dark'} onClick={() => theme === 'dark' && onToggleTheme()}>☀ 라이트</button>
-          <button type="button" className="flex-1" aria-pressed={theme === 'dark'} onClick={() => theme !== 'dark' && onToggleTheme()}>☾ 다크</button>
+          <button type="button" className="flex-1" aria-pressed={theme !== 'dark'} onClick={() => theme === 'dark' && onToggleTheme()}><Icon icon={faSun} className="mr-1.5" />라이트</button>
+          <button type="button" className="flex-1" aria-pressed={theme === 'dark'} onClick={() => theme !== 'dark' && onToggleTheme()}><Icon icon={faMoon} className="mr-1.5" />다크</button>
         </div>
       </section>
       <section className="space-y-3 border-t border-ui-border pt-4" aria-labelledby="settings-sound">
