@@ -32,8 +32,12 @@ export function Entry({ connected, send, status, account, accountNotice, actionE
 
   return (
     <div className='entry-page'>
-      <section aria-labelledby='entry-title' className='panel entry-card'>
+      {/* 넓은 화면: 왼쪽에 사진(원래 비율 그대로, 잘리지 않음)과 명예의 전당, 오른쪽에 입장 조작.
+          좁은 화면: 사진 → 입장 조작 → 명예의 전당 순서로 쌓인다. */}
+      <div className='panel entry-visual'>
         <img src={officeLanding} className='entry-illustration' alt='옆에 선 부장님을 흘끗 보며 키보드를 누르는 직원' width={1672} height={941} />
+      </div>
+      <section aria-labelledby='entry-title' className='panel entry-card'>
         <div className='entry-controls space-y-5'>
           <div>
             <h2 id='entry-title' className='text-3xl font-extrabold tracking-tight'>사무실 입장</h2>
@@ -62,7 +66,10 @@ export function Entry({ connected, send, status, account, accountNotice, actionE
               </button>)}
             </div>
 
-            {mode === 'TEAM' ? <div role='tabpanel' aria-label='함께 하기' className='space-y-3'>
+            {/* 두 화면을 같은 칸에 겹쳐 두고 보이는 것만 바꿔, 함께/혼자를 바꿔도 크기가 그대로다. */}
+            <div className='grid'>
+            <div role='tabpanel' aria-label='함께 하기' aria-hidden={mode !== 'TEAM'} inert={mode !== 'TEAM'}
+              className={'col-start-1 row-start-1 space-y-3 ' + (mode === 'TEAM' ? '' : 'invisible')}>
               <button id='create' type='button' disabled={!ready}
                 className='primary-action w-full rounded-lg px-4 py-2.5 text-sm font-bold'
                 onClick={() => { enableSound(); send('CREATE'); }}>
@@ -87,7 +94,8 @@ export function Entry({ connected, send, status, account, accountNotice, actionE
               </form>
               {joinError && <p id='join-error' role='alert' className='text-xs text-rose-700 dark:text-rose-300'>{joinError}</p>}
             </div>
-              : <form role='tabpanel' aria-label='혼자 하기' className='space-y-3'
+              <form role='tabpanel' aria-label='혼자 하기' aria-hidden={mode !== 'SOLO'} inert={mode !== 'SOLO'}
+                className={'col-start-1 row-start-1 space-y-3 ' + (mode === 'SOLO' ? '' : 'invisible')}
                 onSubmit={event => {
                   event.preventDefault();
                   if (!ready) return;
@@ -117,7 +125,8 @@ export function Entry({ connected, send, status, account, accountNotice, actionE
                 <p className='text-xs text-ui-secondary'>
                   {account?.member ? '기록이 ' + minutes + '분 명예의 전당에 올라가요.' : '게스트 기록은 명예의 전당에 오르지 않아요.'}
                 </p>
-              </form>}
+              </form>
+            </div>
           </section>
         </div>
       </section>
