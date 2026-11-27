@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {box, character} from '../../shared/scene/character.js';
+import {BOSS, STAFF, glbActor} from '../../shared/scene/glb-actor.js';
 import {furnish} from './furnishings.js';
 import {turnListener} from '../../shared/audio/spatial-audio.js';
 import {addMeetingWindow} from './office-meeting-window.js';
@@ -67,7 +68,7 @@ function init() {
     box(scene,[0.43,0.025,0.15],[x,0.82,deskZ-forward*0.28],0x596566);
     box(scene,[0.52,0.09,0.46],[x,0.43,z],0x89a3a2);
     dressDesk(x,z,i);
-    const person=character({topColor:colors[i],skin:[0xf0c5a7,0xe4b098,0xca9278][i%3],hairColor:[0x57434b,0x815a4d,0x473847][i%3],hairId:['short','crop','bun'][i%3],accessoryId:i%3?'none':'glasses'});
+    const person=glbActor(STAFF[i], character({topColor:colors[i],skin:[0xf0c5a7,0xe4b098,0xca9278][i%3],hairColor:[0x57434b,0x815a4d,0x473847][i%3],hairId:['short','crop','bun'][i%3],accessoryId:i%3?'none':'glasses'}));
     person.root.position.set(x,0,z);
     person.root.rotation.y=forward===1?0:Math.PI;
     const voice = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -78,19 +79,65 @@ function init() {
     voice.center.set(0.5, 0);
     voice.visible = false;
     person.root.add(voice);
-    workers.push({ ...person, voice });
+    person.voice = voice;
+    workers.push(person);
     scene.add(person.root);
   }
-  boss=character({topId:'jacket',topColor:0x34464d,accessoryId:'glasses'},false);
+  boss=glbActor(BOSS, character({topId:'jacket',topColor:0x34464d,accessoryId:'glasses'},false));
   scene.add(boss.root);
+}
+
+// Rigged staff sit at their desks; a slow head sway keeps them from looking frozen.
+function poseWorker(person, time, dt) {
+  if (!person.ready) {
+    person.fallback.pose(time, false);
+    return;
+  }
+  person.play('Sit (desk)', { fade: 0 });
+  person.mixer.update(dt);
+  const head = person.bone('head');
+  if (head) {
+    // Sway from the seated head pose captured once; the clip may not key the head every frame,
+    // so rotating the live quaternion would accumulate and spin the head.
+    head.userData.seated ??= head.quaternion.clone();
+    head.quaternion.copy(head.userData.seated);
+    head.rotateY(0.085 * Math.sin(time * 0.55));
+    head.rotateZ(0.042 * Math.sin(time * 0.73));
+  }
+}
+
+// The boss's walk cycle covers about 0.48 m/s at normal speed; match it to the step length
+// so the feet do not slide, and alternate a plain walk with a look-around walk.
+const BOSS_WALK_SPEED = 0.48;
+let bossBeat = 0, bossBeatStarted;
+function poseBoss(walking, step, beatStarted, dt) {
+  if (!boss.ready) {
+    boss.fallback.pose(performance.now() / 1000, walking);
+    return;
+  }
+  if (beatStarted !== bossBeatStarted) {
+    bossBeatStarted = beatStarted;
+    bossBeat += 1;
+  }
+  if (walking) {
+    const distance = Math.hypot(step.to.x - step.from.x, step.to.z - step.from.z);
+    const timeScale = THREE.MathUtils.clamp(distance / 2 / BOSS_WALK_SPEED, 0.6, 1.8);
+    boss.play(bossBeat % 3 === 2 ? 'Walk look around (loop)' : 'Walk (loop)', { fade: 0.3, timeScale });
+  } else {
+    boss.play('Stand (idle)', { fade: 0.35 });
+  }
+  boss.mixer.update(dt);
 }
 
 export function updateOffice(context) {
   latest=context;
 }
 
+let lastDraw;
 function draw(now) {
   if (!latest) return;
+  const dt = lastDraw === undefined ? 0 : Math.min(0.1, (now - lastDraw) / 1000);
+  lastDraw = now;
   const {packet, beatStarted, meetingStarts, seatLabels, youLabel, roundSeconds} = latest;
   const {step,walking} = packet;
   const meetingStarted = meetingStarts.values().next().value;
@@ -127,7 +174,7 @@ function draw(now) {
     const count = zoom < 1 && person.root.visible && label ? voiceArcCount(micLevels?.[label] ?? 0) : 0;
     person.voice.visible = count > 0;
     if (count) person.voice.material.map = voiceTextures[count - 1];
-    person.pose(now/1000+i*1.23+(i<participants.length?0:2),false);
+    poseWorker(person, now/1000+i*1.23+(i<participants.length?0:2), dt);
   });
   const t=walking?Math.min(1,(now-beatStarted)/2000):1;
   boss.root.position.set(THREE.MathUtils.lerp(step.from.x,step.to.x,t),0,THREE.MathUtils.lerp(step.from.z,step.to.z,t));
@@ -135,7 +182,7 @@ function draw(now) {
   // Until the server publishes actual boss presence, avoid showing a stationary boss during lunch.
   boss.root.visible=meetingStarted === undefined &&
     (walking || !(packet.lunchStartsInSeconds<=0 && packet.lunchEndsInSeconds>0));
-  boss.pose(now/1000,walking && t<1);
+  poseBoss(walking && t<1, step, beatStarted, dt);
   renderer.render(scene,camera);
 }
 
@@ -146,6 +193,7 @@ export function mountOffice(element) {
   yaw = pitch = 0;
   focus = false;
   monitorFrameDrawn = false;
+  lastDraw = undefined;
   transition = { from: 0, to: 0, started: performance.now() };
   init();
   renderer.setAnimationLoop(draw);
@@ -159,7 +207,8 @@ export function mountOffice(element) {
         object.material.dispose();
       }
     });
-    workers.forEach(({ voice }) => voice.material.dispose());
+    workers.forEach(person => { person.voice.material.dispose(); person.dispose(); });
+    boss.dispose();
     voiceTextures.forEach(texture => texture.dispose());
     renderer.dispose();
     renderer.forceContextLoss();

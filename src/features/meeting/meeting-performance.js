@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { box, character, characterHead, defaultLook, oval } from '../../shared/scene/character.js';
+import { BOSS, PLAYER, glbActor, makeBat } from '../../shared/scene/glb-actor.js';
 
 const impacts = [0.95, 2.05, 3.20];
 const frame = 0x445469;
@@ -114,10 +115,56 @@ function breakables(scene) {
   return [cup, clipboard, chair];
 }
 
+// Bat swing clip timing (30 fps): the bat lands on frame 23.
+const STRIKE_AT = 23 / 30;
+const SWING_BLEND = 0.12;
+
+// Drive the boss's bat swing from the meeting clock: each impact plays the swing so its
+// strike frame lands on the impact, cross-fading from the previous swing (or the hold pose).
+function swingBoss(actor, elapsed, reducedMotion) {
+  if (!actor.swingPair) {
+    const clip = actor.clips.get('Bat swing');
+    actor.swingPair = [actor.mixer.clipAction(clip), actor.mixer.clipAction(clip.clone())];
+    actor.hold = actor.actions.get('Bat hold (idle)');
+    for (const action of [...actor.swingPair, actor.hold]) action.setLoop(THREE.LoopOnce, 1).play();
+    actor.swingPair.forEach(action => { action.clampWhenFinished = true; });
+    actor.hold.setLoop(THREE.LoopRepeat, Infinity);
+  }
+  const [a, b] = actor.swingPair;
+  const duration = a.getClip().duration;
+  const starts = impacts.map(impact => impact - STRIKE_AT);
+  let k = -1;
+  if (!reducedMotion) starts.forEach((start, index) => { if (elapsed >= start) k = index; });
+  const weights = new Map([[a, 0], [b, 0], [actor.hold, 0]]);
+  if (k < 0) {
+    weights.set(actor.hold, 1);
+  } else {
+    const current = k % 2 ? b : a;
+    current.time = Math.min(elapsed - starts[k], duration);
+    const blend = THREE.MathUtils.clamp((elapsed - starts[k]) / SWING_BLEND, 0, 1);
+    weights.set(current, blend);
+    if (k > 0) {
+      const previous = k % 2 ? a : b;
+      previous.time = Math.min(elapsed - starts[k - 1], duration);
+      weights.set(previous, 1 - blend);
+    } else {
+      weights.set(actor.hold, 1 - blend);
+    }
+  }
+  for (const [action, weight] of weights) {
+    action.enabled = true;
+    action.setEffectiveWeight(weight);
+  }
+  actor.mixer.update(0);
+}
+
 export function createMeetingPerformance(scene) {
   const props = breakables(scene);
-  const player = bentPlayer(scene);
-  const boss = character({ topId: 'jacket', topColor: 0x34464d, accessoryId: 'glasses' }, false);
+  const bent = bentPlayer(scene);
+  scene.remove(bent);
+  const player = glbActor(PLAYER, { root: bent });
+  scene.add(player.root);
+  const boss = glbActor(BOSS, character({ topId: 'jacket', topColor: 0x34464d, accessoryId: 'glasses' }, false));
   boss.root.position.set(-0.65, 0, -0.38);
   boss.root.rotation.y = 0.22;
   scene.add(boss.root);
@@ -139,7 +186,30 @@ export function createMeetingPerformance(scene) {
   const strike = new THREE.Vector3();
   const direction = new THREE.Vector3();
 
+  // Once both rigged models are in: give the boss a real bat in his fist, lay the player in
+  // the plank, and put the player's backside (and the hit burst) where the bat actually lands.
+  let staged = false;
+  function stage() {
+    if (staged || !boss.ready || !player.ready) return;
+    staged = true;
+    bat.visible = false;
+    const grip = boss.bone('grip.R');
+    const realBat = makeBat();
+    grip.add(realBat);
+    player.model.rotation.y = Math.PI / 2;          // head toward +X, like the procedural pose
+    player.play('Plank hips up (엎드려뻗쳐)', { fade: 0 });
+    player.mixer.update(0);
+    swingBoss(boss, impacts[0], false);              // strike frame of the first swing
+    scene.updateMatrixWorld(true);
+    const landing = scene.worldToLocal(grip.localToWorld(new THREE.Vector3(0, 0.5, 0)));
+    const hips = scene.worldToLocal(player.bone('hips').getWorldPosition(new THREE.Vector3()));
+    player.root.position.x += landing.x - hips.x;
+    player.root.position.z += landing.z - hips.z;
+    hit.position.set(landing.x, landing.y, landing.z);
+  }
+
   return (elapsed, reducedMotion) => {
+    stage();
     let swing = 0;
     let burst = 0;
     impacts.forEach((impact, index) => {
@@ -151,12 +221,18 @@ export function createMeetingPerformance(scene) {
       if (offset >= 0 && offset < 0.19) burst = 1 - offset / 0.19;
     });
     if (reducedMotion) swing = 0;
-    boss.poseMeeting(swing);
-    boss.grip.getWorldPosition(bat.position);
-    strike.copy(hit.position).sub(bat.position).normalize();
-    direction.lerpVectors(windup, strike, swing).normalize();
-    bat.quaternion.setFromUnitVectors(up, direction);
-    player.scale.y = reducedMotion ? 1 : 1 - 0.11 * burst;
+    if (staged) {
+      swingBoss(boss, elapsed, reducedMotion);
+      player.mixer.update(0);
+    } else {
+      boss.fallback.poseMeeting(swing);
+      boss.fallback.grip.getWorldPosition(bat.position);
+      scene.worldToLocal(bat.position);
+      strike.copy(hit.position).sub(bat.position).normalize();
+      direction.lerpVectors(windup, strike, swing).normalize();
+      bat.quaternion.setFromUnitVectors(up, direction);
+    }
+    player.root.scale.y = reducedMotion ? 1 : 1 - 0.11 * burst;
     hit.visible = !reducedMotion && burst > 0;
     hit.scale.setScalar(1.45 - burst * 0.42);
     return reducedMotion ? 0 : burst;
