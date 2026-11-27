@@ -25,11 +25,11 @@ function useRequest({ account, actionErrors, connected, send }) {
   return { pending, submit, error: verb => actionErrors[verb]?.message };
 }
 
-function PasswordField({ id, label, autoComplete, disabled, shown, name = 'password' }) {
+function PasswordField({ id, label, autoComplete, disabled, shown, name = 'password', placeholder }) {
   return <div className="min-w-0 space-y-1">
     <label htmlFor={id} className="text-xs font-semibold text-ui-secondary">{label}</label>
     <input id={id} name={name} type={shown ? 'text' : 'password'} className="field w-full"
-      autoComplete={autoComplete} minLength={6} maxLength={64} disabled={disabled} required />
+      autoComplete={autoComplete} minLength={6} maxLength={64} disabled={disabled} placeholder={placeholder} required />
   </div>;
 }
 
@@ -40,11 +40,11 @@ function ShowPassword({ shown, onChange }) {
   </label>;
 }
 
-function NameField({ id, label, autoComplete, disabled, hint }) {
+function NameField({ id, label, autoComplete, disabled, hint, placeholder }) {
   return <div className="space-y-1">
     <label htmlFor={id} className="text-xs font-semibold text-ui-secondary">{label}</label>
     <input id={id} name="name" className="field w-full" autoComplete={autoComplete} minLength={2} maxLength={10}
-      pattern={namePattern} title="한글·영문·숫자·_·- 2~10자, 공백 없이" disabled={disabled} required />
+      pattern={namePattern} title="한글·영문·숫자·_·- 2~10자, 공백 없이" placeholder={placeholder} disabled={disabled} required />
     {hint && <p className="text-[11px] text-ui-caption">{hint}</p>}
   </div>;
 }
@@ -119,15 +119,14 @@ export function AccountEntry({ account, notice, actionErrors, connected, send })
         onClick={() => { setTab(item.id); setMismatch(''); }}>{item.label}</button>)}
     </div>
 
-    {/* 세 입력 화면을 같은 칸에 겹쳐 두고 보이는 것만 바꾼다. 칸 높이가 가장 큰 화면(회원가입)에 맞춰져
-        탭을 바꿔도 카드 크기가 그대로다. */}
+    {/* 입력칸만 같은 칸에 겹쳐 두고(높이 = 가장 큰 입력 화면), 안내·버튼·바로가기는 세 탭이 함께 쓴다.
+        그래서 탭을 바꿔도 카드 크기와 버튼 위치가 그대로다. 버튼은 form 속성으로 지금 탭의 입력과 이어진다. */}
     <div className="mt-3 grid">
       {tabs.map(item => {
         const active = tab === item.id;
-        const message = active ? (mismatch || error(item.id) || (!account && notice) || '') : '';
-        const isError = active && Boolean(mismatch || error(item.id));
-        return <form key={item.id} aria-hidden={!active} inert={!active}
-          className={'col-start-1 row-start-1 flex flex-col gap-3 ' + (active ? '' : 'invisible')}
+        return <form key={item.id} id={ids + '-' + item.id} aria-hidden={!active} inert={!active}
+          className={'col-start-1 row-start-1 flex flex-col gap-3 ' + (item.id === 'GUEST' ? 'justify-between ' : '') +
+            (active ? '' : 'invisible')}
           onSubmit={event => onSubmit(event, item.id)}>
           {item.id === 'LOGIN' && <>
             <NameField id={ids + '-login-name'} label="이름" autoComplete="username" disabled={pending} />
@@ -136,34 +135,42 @@ export function AccountEntry({ account, notice, actionErrors, connected, send })
           </>}
           {item.id === 'SIGNUP' && <>
             <NameField id={ids + '-signup-name'} label="이름" autoComplete="username" disabled={pending}
-              hint="한글·영문·숫자 2~10자 · 방과 명예의 전당에 보여요" />
+              placeholder="한글·영문·숫자 2~10자" />
             <div className="grid grid-cols-2 gap-2">
-              <PasswordField id={ids + '-signup-password'} label="비밀번호 (6자 이상)" autoComplete="new-password" disabled={pending} shown={shown} />
-              <PasswordField id={ids + '-signup-confirm'} name="confirm" label="비밀번호 확인" autoComplete="new-password" disabled={pending} shown={shown} />
+              <PasswordField id={ids + '-signup-password'} label="비밀번호" autoComplete="new-password" disabled={pending}
+                shown={shown} placeholder="6자 이상" />
+              <PasswordField id={ids + '-signup-confirm'} name="confirm" label="비밀번호 확인" autoComplete="new-password"
+                disabled={pending} shown={shown} placeholder="한 번 더" />
             </div>
             <ShowPassword shown={shown} onChange={setShown} />
           </>}
           {item.id === 'GUEST' && <>
-            <NameField id={ids + '-guest-name'} label="닉네임" autoComplete="nickname" disabled={pending} />
+            <NameField id={ids + '-guest-name'} label="닉네임" autoComplete="nickname" disabled={pending}
+              placeholder="한글·영문·숫자 2~10자" />
             <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-950 dark:bg-amber-950 dark:text-amber-100">
               게스트는 판 결과와 꾸미기가 저장되지 않고 명예의 전당에도 오르지 않아요.
+              기록을 남기려면 <button type="button" className="font-semibold underline" onClick={() => setTab('SIGNUP')}>회원가입</button>하세요.
             </p>
           </>}
-          {/* 안내·오류 자리를 미리 잡아 두어 문구가 생겨도 높이가 바뀌지 않게 한다. */}
-          <p role={isError ? 'alert' : 'status'} className={'min-h-4 text-xs leading-4 ' +
-            (isError ? 'text-rose-700 dark:text-rose-300' : 'text-ui-secondary')}>{message}</p>
-          <div className="mt-auto space-y-3">
-            <button type="submit" className="primary-action w-full rounded-lg px-4 py-2.5 text-sm font-bold"
-              disabled={!connected || pending}>
-              {pending && active ? '확인 중…' : item.id === 'LOGIN' ? '로그인' : item.id === 'SIGNUP' ? '가입하고 시작하기' : '게스트로 시작하기'}
-            </button>
-            {item.id === 'LOGIN' && <p className="text-center text-xs text-ui-secondary">
-              처음이라면 <button type="button" className="font-semibold text-ui-text underline" onClick={() => setTab('SIGNUP')}>회원가입</button>
-              {' '}또는 <button type="button" className="font-semibold text-ui-text underline" onClick={() => setTab('GUEST')}>게스트로 시작</button>
-            </p>}
-          </div>
         </form>;
       })}
     </div>
+
+    {(() => {
+      const message = mismatch || error(tab) || (!account && notice) || '';
+      const isError = Boolean(mismatch || error(tab));
+      return <p role={isError ? 'alert' : 'status'} className={'mt-2 min-h-4 text-xs leading-4 ' +
+        (isError ? 'text-rose-700 dark:text-rose-300' : 'text-ui-secondary')}>{message}</p>;
+    })()}
+    <button type="submit" form={ids + '-' + tab} className="primary-action mt-2 w-full rounded-lg px-4 py-2.5 text-sm font-bold"
+      disabled={!connected || pending}>
+      {pending ? '확인 중…' : tab === 'LOGIN' ? '로그인' : tab === 'SIGNUP' ? '가입하고 시작하기' : '게스트로 시작하기'}
+    </button>
+    {/* 바로가기는 로그인 탭에서만 보이지만 자리는 늘 잡아 둔다(카드 높이 고정). */}
+    <p aria-hidden={tab !== 'LOGIN'} inert={tab !== 'LOGIN'}
+      className={'mt-3 text-center text-xs text-ui-secondary ' + (tab === 'LOGIN' ? '' : 'invisible')}>
+      처음이라면 <button type="button" className="font-semibold text-ui-text underline" onClick={() => setTab('SIGNUP')}>회원가입</button>
+      {' '}또는 <button type="button" className="font-semibold text-ui-text underline" onClick={() => setTab('GUEST')}>게스트로 시작</button>
+    </p>
   </section>;
 }
