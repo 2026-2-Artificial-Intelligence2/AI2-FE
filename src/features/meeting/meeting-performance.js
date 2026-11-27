@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { box, character, oval } from '../../shared/scene/character.js';
 import { BOSS, glbActor, makeBat } from '../../shared/scene/glb-actor.js';
+import { MEETING_IMPACTS as impacts } from './meeting-timing.js';
 
-const impacts = [0.95, 2.05, 3.20];
 const frame = 0x445469;
 const up = new THREE.Vector3(0, 1, 0);
 

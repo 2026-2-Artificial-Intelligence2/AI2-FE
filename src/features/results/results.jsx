@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { sfx } from '../../shared/audio/spatial-audio.js';
 import { clock, number, signed, won } from '../../shared/format.js';
 
 const playerLabel = (player, you) => player === you ? player + ' (나)' : player;
@@ -205,6 +206,18 @@ export function Results({ result, name, host, solo, connected, send, restartErro
   const winners = standings.filter(row => row.rank === 1);
   const myProfit = mine && profitOf(mine, startingCashWon);
   const { title, sub, celebrate } = headline({ mine, winners, solo, profit: myProfit });
+  const showAwards = !solo && result.awards?.length > 0;
+
+  // 방금 퇴근했을 때만(재접속으로 다시 받은 결과는 조용히): 퇴근 종 → 축하·실망 → 직원상.
+  useEffect(() => {
+    if (!result.fresh) return;
+    const timers = [];
+    const sad = solo && myProfit?.won < 0;
+    if (celebrate) timers.push(setTimeout(sfx.winner, 1100));
+    else if (sad) timers.push(setTimeout(sfx.loss, 1100));
+    if (showAwards) timers.push(setTimeout(sfx.award, celebrate || sad ? 3600 : 1400));
+    return () => timers.forEach(clearTimeout);
+  }, [result]);   // eslint-disable-line react-hooks/exhaustive-deps
   const scale = {
     max: Math.max(1, ...standings.map(row => Math.abs(row.netWorthWon))),
     hasNegative: standings.some(row => row.netWorthWon < 0),
@@ -263,7 +276,7 @@ export function Results({ result, name, host, solo, connected, send, restartErro
       </p>}
     </header>
 
-    {!solo && result.awards?.length > 0 && <EmployeeAwards awards={result.awards} you={you} />}
+    {showAwards && <EmployeeAwards awards={result.awards} you={you} />}
 
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(17rem,0.65fr)]">
       <section className="panel min-w-0 p-5" aria-labelledby="rankings-title">

@@ -1,4 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { sfx } from '../../shared/audio/spatial-audio.js';
+import { MEETING_IMPACTS } from './meeting-timing.js';
 
 const dialogue = {
   idle: '아까부터 일이 하나도 안 올라오던데. 자리로 돌아가면 밀린 일부터 처리해.',
@@ -15,6 +17,14 @@ export function Meeting({ reason, startedAt, character }) {
   useLayoutEffect(() => {
     container.current.focus({ preventScroll: true });
   }, []);
+
+  // 빠따가 닿는 순간마다 타격음. 재접속 등으로 이미 지난 타격은 건너뛴다.
+  useEffect(() => {
+    const elapsed = (performance.now() - startedAt) / 1000;
+    const timers = MEETING_IMPACTS.filter(at => at > elapsed)
+      .map(at => setTimeout(sfx.hit, (at - elapsed) * 1000));
+    return () => timers.forEach(clearTimeout);
+  }, [startedAt]);
 
   useEffect(() => {
     let closed = false;
