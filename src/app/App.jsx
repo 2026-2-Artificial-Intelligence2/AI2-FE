@@ -57,6 +57,11 @@ export function App() {
   const host = room?.you === room?.room.hostId;
   const name = symbol => game.stocks.find(stock => stock.id === symbol)?.name ?? symbol;
 
+  // 방장이 게임 중에 나가 모두 대기실로 돌아오면(새 판) 열려 있던 창을 닫는다.
+  useEffect(() => {
+    setActiveDialog(null);
+  }, [room?.code, room?.round]);
+
   useEffect(() => {
     if (!officeActive) {
       setLooking(false);

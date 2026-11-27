@@ -51,7 +51,8 @@ function commandResponse(command) {
       message.symbol === target && message.side.endsWith(verb === 'SELL' ? '매도' : '매수')];
     case 'CANCEL': return [verb, message => message.type === 'orders' && !message.orders.some(order => order.id === Number(target))];
     case 'LOAN': return [verb, message => message.type === 'work' && message.desk.balance.loanRepayWon > 0];
-    case 'LEAVE': return [verb, message => message.type === 'closed'];
+    // 방장이 게임 중이나 퇴근 뒤에 나가면 방이 닫히지 않고 같은 방 대기실로 돌아온다.
+    case 'LEAVE': return [verb, message => message.type === 'closed' || (message.type === 'state' && !message.room.startedAt)];
     case 'CHAT': return [verb, (message, you) => message.type === 'chat' && message.message.from === you &&
       (message.message.to ?? 'ALL') === target && message.message.text === command.slice(6 + target.length)];
     case 'LEAK_ARTICLE': return ['CHAT', message => message.type === 'leakSent'];
