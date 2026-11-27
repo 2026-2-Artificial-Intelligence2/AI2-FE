@@ -150,6 +150,39 @@ function Confetti() {
   </div>;
 }
 
+/** 오늘의 직원상. 서버의 award 이름별 제목·설명·값 표시. */
+const awardInfo = {
+  scolded: { icon: '🫡', title: '부장님 단골상', caption: '부장님과 가장 자주 면담했어요', value: v => number(v) + '번 훈계' },
+  biggestLoss: { icon: '😭', title: '눈물의 퇴근상', caption: '오늘 가장 많이 잃었어요', value: v => won(v) },
+  hardestWorker: { icon: '💼', title: '업무왕', caption: '주식보다 업무에 진심이었어요', value: v => number(v) + '건 처리' },
+};
+
+function EmployeeAwards({ awards, you }) {
+  const shown = awards.filter(award => awardInfo[award.award]);
+  if (!shown.length) return null;
+  return <section className="panel p-5" aria-labelledby="awards-title">
+    <h3 id="awards-title" className="text-lg font-bold">오늘의 직원상</h3>
+    <ul className="mt-3 grid gap-2.5 sm:grid-cols-3">
+      {shown.map(award => {
+        const info = awardInfo[award.award];
+        const mine = award.players.includes(you);
+        return <li key={award.award} data-award={award.award} data-mine={mine}
+          className="result-award flex min-w-0 items-start gap-3 rounded-xl border border-ui-border bg-ui-subtle p-3.5 data-[mine=true]:border-amber-400 data-[mine=true]:bg-amber-50 dark:data-[mine=true]:bg-amber-950/40">
+          <span className="result-award-icon grid size-11 shrink-0 place-items-center rounded-xl bg-ui-surface text-2xl" aria-hidden="true">{info.icon}</span>
+          <span className="min-w-0">
+            <span className="block font-bold">{info.title}{award.players.length > 1 && <span className="ml-1 text-xs font-semibold text-ui-secondary">공동</span>}</span>
+            <span className="block text-xs text-ui-secondary">{info.caption}</span>
+            <span className="mt-1 block font-semibold [overflow-wrap:anywhere]">{award.players.map(player => playerLabel(player, you)).join(', ')}</span>
+            <span className={'block text-sm font-bold tabular-nums ' + (award.award === 'biggestLoss' ? movement(award.value) : '')}>
+              {award.award === 'biggestLoss' && arrow(award.value)}{info.value(award.value)}
+            </span>
+          </span>
+        </li>;
+      })}
+    </ul>
+  </section>;
+}
+
 function headline({ mine, winners, solo, profit }) {
   if (!mine) return { title: '퇴근 · 최종 정산' };
   if (solo) {
@@ -158,7 +191,7 @@ function headline({ mine, winners, solo, profit }) {
     return { title: '퇴근 · 최종 정산', sub: profit?.won < 0 ? '오늘은 시장이 야속했어요.' : undefined };
   }
   if (mine.rank === 1) return {
-    title: winners.length > 1 ? '공동 퇴근왕!' : '오늘의 퇴근왕!',
+    title: winners.length > 1 ? '공동 주식왕!' : '오늘의 주식왕!',
     sub: '부장님 몰래 누구보다 많이 불렸어요. 축하해요!', celebrate: true,
   };
   return { title: '퇴근 · 최종 정산', sub: mine.rank + '위로 퇴근했어요. 다음 판엔 왕관을 노려 봐요!' };
@@ -229,6 +262,8 @@ export function Results({ result, name, host, solo, connected, send, restartErro
         {result.recordNotice}
       </p>}
     </header>
+
+    {!solo && result.awards?.length > 0 && <EmployeeAwards awards={result.awards} you={you} />}
 
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(17rem,0.65fr)]">
       <section className="panel min-w-0 p-5" aria-labelledby="rankings-title">
