@@ -59,6 +59,7 @@ export function AccountEntry({ account, notice, actionErrors, connected, send, r
   const [shown, setShown] = useState(false);
   const { pending, submit, error } = useRequest({ account, actionErrors, connected, send });
   const [dialog, setDialog] = useState(null);   // 'ACCOUNT' 내 정보, 'RESET' 비밀번호 찾기
+  const [renaming, setRenaming] = useState(false);   // 게스트 닉네임 바꾸기
   const closeDialog = React.useCallback(() => setDialog(null), []);
   // 가입·복구 뒤 새 복구 코드는 다른 창보다 먼저 보여 준다.
   const dialogs = <>
@@ -70,7 +71,15 @@ export function AccountEntry({ account, notice, actionErrors, connected, send, r
   </>;
 
   // 로그인·가입·게스트가 되면 입력 화면을 닫는다.
-  useEffect(() => { setSwitching(false); setMismatch(''); }, [account?.name, account?.member]);
+  useEffect(() => { setSwitching(false); setRenaming(false); setMismatch(''); }, [account?.name, account?.member]);
+
+  // 게스트는 GUEST를 새 닉네임으로 다시 보내면 이름이 바뀐다(방 밖에서만, 저장하는 것은 없다).
+  function renameGuest(event) {
+    event.preventDefault();
+    const name = String(new FormData(event.currentTarget).get('name') ?? '').trim();
+    if (!name || name === account.name) { setRenaming(false); return; }
+    submit('GUEST', ' ' + name);
+  }
 
   function onSubmit(event, verb) {
     event.preventDefault();
@@ -106,7 +115,7 @@ export function AccountEntry({ account, notice, actionErrors, connected, send, r
               {account.member ? '회원' : '게스트'}
             </span>
           </p>
-          <p className="mt-0.5 text-xs text-ui-secondary">
+          <p className="mt-0.5 text-xs break-keep text-ui-secondary">
             {account.member ? '판 결과와 1인 플레이 기록이 저장돼요.' : '기록이 저장되지 않아요.'}
           </p>
         </div>
@@ -117,9 +126,21 @@ export function AccountEntry({ account, notice, actionErrors, connected, send, r
             <button type="button" className="control text-xs" disabled={!connected || pending}
               onClick={() => submit('LOGOUT')}>로그아웃</button>
           </div>
-          : <button type="button" className="control shrink-0 text-xs" disabled={!connected}
-            onClick={() => { setTab('SIGNUP'); setSwitching(true); }}>회원으로 저장하기</button>}
+          : <div className="flex shrink-0 flex-col gap-1.5">
+            <button type="button" className="control text-xs" disabled={!connected || renaming}
+              onClick={() => setRenaming(true)}>이름 바꾸기</button>
+            <button type="button" className="control text-xs" disabled={!connected}
+              onClick={() => { setTab('SIGNUP'); setSwitching(true); }}>회원으로 저장하기</button>
+          </div>}
       </div>
+      {renaming && <form className="mt-3 flex gap-2 border-t border-ui-border pt-3" onSubmit={renameGuest}>
+        <input name="name" aria-label="새 닉네임" className="field min-w-0 flex-1" defaultValue={account.name} autoFocus
+          minLength={2} maxLength={10} pattern={namePattern} title="한글·영문·숫자·_·- 2~10자, 공백 없이" required disabled={pending} />
+        <button type="submit" className="control shrink-0 text-xs" disabled={!connected || pending}>{pending ? '확인 중…' : '바꾸기'}</button>
+        <button type="button" className="shrink-0 text-xs font-semibold text-ui-secondary underline" disabled={pending}
+          onClick={() => setRenaming(false)}>취소</button>
+      </form>}
+      {renaming && error('GUEST') && <p role="alert" className="mt-2 text-xs text-rose-700 dark:text-rose-300">{error('GUEST')}</p>}
       {error('LOGOUT') && <p role="alert" className="mt-2 text-xs text-rose-700 dark:text-rose-300">{error('LOGOUT')}</p>}
     </section>;
   }
