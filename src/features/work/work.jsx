@@ -132,18 +132,21 @@ function WorkForm({ task, connected, lunch, active, workError, send }) {
   </form>;
 }
 
-export function Work({ game, visible, active, send, gauges }) {
+export function Work({ game, visible, active, send, gauges, loanAction }) {
   const { desk, market, connected, workError, workCompletion } = game;
   const { balance, task, rewardWon } = desk;
   const kind = kinds[task.kind ?? 'sheet'];
   const lunch = market?.lunchStartsInSeconds <= 0 && market.lunchEndsInSeconds > 0;
 
-  return <section id="work" hidden={!visible} aria-labelledby="work-title" className="panel overflow-hidden">
-    <header className="flex flex-wrap items-center justify-between gap-3 border-b border-ui-border px-4 py-4 sm:px-6">
-      <h2 id="work-title" className="text-lg font-bold">사내 업무</h2>
-      <p role="status" className="mr-auto text-sm font-medium text-indigo-800 dark:text-indigo-200">
-        {workCompletion && '직전 업무 완료 · ' + won(workCompletion.rewardWon) + ' 지급'}
-      </p>
+  return <section id="work" hidden={!visible} aria-labelledby="work-title" className="panel @container overflow-hidden">
+    <header className="game-section-header border-b border-ui-border px-4 py-4 sm:px-6">
+      <div className="min-w-0">
+        <h2 id="work-title" className="text-lg font-bold">사내 업무</h2>
+        <p role="status" className="text-sm font-medium text-indigo-800 dark:text-indigo-200">
+          {workCompletion && '직전 업무 완료 · ' + won(workCompletion.rewardWon) + ' 지급'}
+        </p>
+      </div>
+      {visible && loanAction}
       {visible && gauges}
     </header>
     <div className="grid md:grid-cols-[13rem_minmax(0,1fr)]">

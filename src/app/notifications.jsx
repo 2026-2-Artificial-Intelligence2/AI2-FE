@@ -13,6 +13,7 @@ function Bubble({ label, hint, icon, count, expanded, onClick }) {
 
 export function Notifications({ game, inbox, toggleInbox, messengerOpen, openMessenger, lastChat, lastNews, dismissNews }) {
   const [preview, setPreview] = useState(null);
+  const solo = Boolean(game.room?.solo);
   const chat = game.chats.findLast(item => item.id > Math.max(lastChat, game.chatHistoryEnd ?? 0) &&
     item.from !== game.room?.youLabel);
   const messages = game.chats.filter(item => item.id > Math.max(lastChat, game.chatHistoryEnd ?? 0) &&
@@ -30,9 +31,10 @@ export function Notifications({ game, inbox, toggleInbox, messengerOpen, openMes
   const count = Math.max(0, (game.history.at(-1)?.number ?? 0) - lastNews);
 
   return <aside className="fixed right-4 bottom-4 z-20 flex max-w-[calc(100vw-2rem)] flex-col items-end gap-3 sm:right-6 sm:bottom-6"
-    aria-label="컴퓨터 알림과 메신저">
+    aria-label={solo ? "컴퓨터 알림" : "컴퓨터 알림과 메신저"}>
     {inbox && <section id="news-history"
-      className="panel absolute right-0 bottom-32 flex max-h-[min(33rem,calc(100dvh-10rem))] w-[min(30rem,calc(100vw-2rem))] flex-col overflow-hidden shadow-xl"
+      className={'panel absolute right-0 flex max-h-[min(33rem,calc(100dvh-10rem))] w-[min(30rem,calc(100vw-2rem))] flex-col overflow-hidden shadow-xl ' +
+        (solo ? 'bottom-16' : 'bottom-32')}
       aria-labelledby="news-history-title">
       <header className="flex shrink-0 items-center justify-between gap-2 border-b border-ui-border bg-ui-muted px-4 py-2.5">
         <h2 id="news-history-title" className="font-bold">뉴스 알림함</h2>
@@ -63,13 +65,13 @@ export function Notifications({ game, inbox, toggleInbox, messengerOpen, openMes
       </div>}
       <Bubble label="뉴스 알림함" hint="N" icon="▤" count={inbox ? 0 : count} expanded={inbox} onClick={toggleInbox} />
     </div>
-    <div className="flex items-end gap-2">
+    {!solo && <div className="flex items-end gap-2">
       {preview && !messengerOpen && <button type="button" onClick={() => openMessenger(preview.to ? preview.from : 'ALL')}
         className="notification-preview notification-preview--chat w-[min(22rem,calc(100vw-5rem))]">
         <b className="block text-xs text-ui-secondary">{preview.from} · {preview.to ? '귓속말' : '단체방'} <KeyHint>M</KeyHint></b>
         <span className="mt-1 line-clamp-2 block text-sm [overflow-wrap:anywhere]">{preview.text}</span>
       </button>}
       <Bubble label="메신저" hint="M" icon="✉" count={messengerOpen ? 0 : messages} expanded={messengerOpen} onClick={openMessenger} />
-    </div>
+    </div>}
   </aside>;
 }

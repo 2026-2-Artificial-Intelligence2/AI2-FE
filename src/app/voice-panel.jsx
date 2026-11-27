@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 
 // 머리글의 음성 대화: 버튼 하나만 두고, 누르면 아래로 설정 창(참여·음소거·참여자·사람별 음량·나가기)을 펼친다.
 // 바깥을 누르거나 Esc를 누르면 닫힌다.
-export function VoicePanel({ voice, connected }) {
+export function VoicePanel({ voice, connected, serverError }) {
   const [open, setOpen] = useState(false);
   const box = useRef(null);
 
@@ -21,26 +21,28 @@ export function VoicePanel({ voice, connected }) {
   if (!voice.available) return null;
 
   const others = voice.people.filter(person => !person.me);
+  const error = voice.error || serverError;
   const someoneSpeaking = voice.people.some(person => person.speaking && !person.me);
   const label = !voice.joined ? '음성' : voice.micStalled ? '음성 · 마이크 멈춤' : voice.blocked ? '음성 · 소리 켜기'
     : voice.muted ? '음성 · 음소거'
     : '음성 · ' + voice.people.length + '명';
 
   return <div ref={box} className="relative">
-    <button type="button" className="control flex items-center gap-1.5" aria-haspopup="dialog" aria-expanded={open}
-      aria-label={'음성 대화 설정 (' + label + ')'} onClick={() => { voice.unlock(); setOpen(value => !value); }}>
-      <span aria-hidden="true" className={'inline-block h-2 w-2 rounded-full ' + (!voice.joined ? 'bg-ui-track'
+    <button type="button" className="control flex min-h-11 items-center gap-1.5 whitespace-nowrap sm:min-h-0" aria-haspopup="dialog" aria-expanded={open}
+      aria-label={'음성 대화 설정 (' + label + ')'} title={label} onClick={() => { voice.unlock(); setOpen(value => !value); }}>
+      <span aria-hidden="true" className={'inline-block size-2 shrink-0 rounded-full ' + (!voice.joined ? 'bg-ui-track'
         : voice.micStalled || voice.blocked ? 'bg-amber-500'
         : voice.muted ? 'bg-rose-500' : someoneSpeaking ? 'bg-emerald-500' : 'bg-emerald-300')} />
-      {label}
+      <span className="lg:hidden">음성</span>
+      <span className="hidden lg:inline">{label}</span>
     </button>
 
     {open && <div role="dialog" aria-label="음성 대화"
       className="absolute right-0 z-40 mt-2 w-72 space-y-3 rounded-xl border border-ui-border bg-ui-surface p-4 text-sm shadow-lg">
+      {error && <p role="alert" className="text-xs text-rose-700 dark:text-rose-300">{error}</p>}
       {!voice.joined ? <>
         <p className="leading-relaxed text-ui-secondary">같은 방 사람들과 목소리로 이야기해요. 목소리는 서버를 거치지 않고
           참여한 사람끼리만 오가요.</p>
-        {voice.error && <p role="alert" className="text-xs text-rose-700 dark:text-rose-300">{voice.error}</p>}
         <button type="button" className="primary-action w-full rounded-lg px-3 py-2 font-bold"
           disabled={!connected || voice.requesting} onClick={() => voice.join()}>
           {voice.requesting ? '마이크 권한 확인 중…' : '음성 참여'}

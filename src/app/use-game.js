@@ -2,17 +2,41 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { footsteps, cough } from '../shared/audio/spatial-audio.js';
 
 const seatKey = 'officeStockSeat';
+const loginKey = 'officeStockLogin';
+
+function readLoginToken() {
+  try {
+    return localStorage.getItem(loginKey);
+  } catch {
+    return null;
+  }
+}
+
+function saveLoginToken(token) {
+  try {
+    if (token) localStorage.setItem(loginKey, token);
+    else localStorage.removeItem(loginKey);
+  } catch {
+    // The open connection can still use the account if device storage is unavailable.
+  }
+}
 const initial = {
   stocks: [], candles: {}, orders: [], trades: [], history: [], chats: [],
-  status: '연결 중…', actionErrors: {},
+  status: '연결 중…', actionErrors: {}, account: null, accountNotice: '',
 };
 
-// The server sends an unlabelled error or a command-specific success packet.
+// Success predicates are used only with servers that do not advertise request IDs.
 function commandResponse(command) {
   const [verb, target, symbol, price, quantity] = command.split(' ', 5);
   switch (verb) {
+    case 'SIGNUP':
+    case 'LOGIN': return [verb, message => message.type === 'profile'];
+    case 'GUEST': return [verb, message => message.type === 'guest'];
+    case 'LOGOUT': return [verb, message => message.type === 'loggedOut'];
+    case 'LEADERBOARD': return [verb, message => message.type === 'leaderboard'];
     case 'CREATE':
     case 'JOIN': return [verb, message => message.type === 'state'];
+    case 'SOLO':
     case 'START': return [verb, message => message.type === 'state' && message.room.startedAt];
     case 'RESTART': return [verb, message => message.type === 'state' && !message.room.startedAt];
     case 'LENGTH': return [verb, message => message.type === 'state' && message.sessionSeconds === Number(target) * 60];
@@ -31,7 +55,7 @@ function commandResponse(command) {
       (message.message.to ?? 'ALL') === target && message.message.text === command.slice(6 + target.length)];
     case 'LEAK_ARTICLE': return ['CHAT', message => message.type === 'leakSent'];
     case 'SWITCH':
-    case 'MESSENGER': return ['GENERAL', message => message.type === 'view'];
+    case 'MESSENGER': return ['VIEW', message => message.type === 'view'];
     case 'NEWS': return ['NEWS', message => message.type === 'newsHistory'];
     // 음성 연결 정보(VOICE SIGNAL)는 따로 답이 없으므로 기다리지 않는다.
     case 'VOICE': return target === 'SIGNAL' ? null : ['VOICE', message => message.type === 'state'];
@@ -52,15 +76,26 @@ function mergeCandles(history, latest) {
 
 function reduce(game, message, receivedAt) {
   switch (message.type) {
+    case 'profile': return {
+      ...game, account: { member: true, name: message.name }, accountNotice: '',
+    };
+    case 'guest': return {
+      ...game, account: { member: false, name: message.name }, accountNotice: message.notice,
+    };
+    case 'profileFailed': return { ...game, account: null, accountNotice: message.message };
+    case 'loggedOut': return { ...game, account: null, accountNotice: '' };
+    case 'leaderboard': return { ...game, leaderboard: message.boards };
     case 'state': {
       const sameRoom = game.room?.code === message.code;
       const sameRound = sameRoom && game.room.round === message.round;
       return {
         ...(message.room.startedAt ? game : {
           ...initial, chats: sameRoom ? game.chats : [],
+          account: game.account, accountNotice: game.accountNotice,
           micLevels: sameRoom ? game.micLevels : undefined,
           actionErrors: sameRound ? game.actionErrors : initial.actionErrors,
         }),
+        startingSolo: game.startingSolo && message.solo && !message.room.startedAt,
         status: '',
         connected: true,
         room: message,
@@ -103,14 +138,20 @@ function reduce(game, message, receivedAt) {
     case 'voiceConfig': return { ...game, voiceIceServers: message.iceServers };
     case 'workError': return { ...game, workError: message };
     case 'error': return {
-      ...game, lastError: message, actionErrors: { ...game.actionErrors, [message.scope]: message },
+      ...game,
+      lastViewError: message.scope === 'VIEW' ? message : game.lastViewError,
+      startingSolo: message.scope === 'SOLO' ? false : game.startingSolo,
+      actionErrors: { ...game.actionErrors, [message.scope]: message },
     };
     case 'notice': return { ...game, notice: message };
     case 'replaced': return { ...game, status: message.message };
     case 'dismissNews': return { ...game, popup: null };
     case 'newsHistory': return { ...game, history: message.items };
     case 'closed':
-    case 'resumeFailed': return { ...initial, connected: true, status: message.message };
+    case 'resumeFailed': return {
+      ...initial, connected: true, status: message.message,
+      account: game.account, accountNotice: game.accountNotice,
+    };
     default: return game;
   }
 }
@@ -121,19 +162,33 @@ export function useGame() {
   const office = useRef(null);
   /** 음성 연결 정보(voiceSignal)를 받을 함수. 화면 상태에 넣지 않고 바로 넘긴다(use-voice.js). */
   const voiceSignals = useRef(null);
-  const pendingCommands = useRef([]);
+  const requestIds = useRef(false);
+  const nextRequestId = useRef(0);
+  const requests = useRef(new Map());
+  const legacyCommands = useRef([]);
   const send = useCallback(command => {
     if (socket.current?.readyState !== WebSocket.OPEN) return false;
     const response = commandResponse(command);
+    let payload = command;
     if (response) {
       const [scope, matches] = response;
-      pendingCommands.current.push({ scope, matches, sentAt: performance.now() });
-      if (scope !== 'WORK' && scope !== 'LOAN' && scope !== 'LEAVE' && scope !== 'CHAT') {
+      if (requestIds.current) {
+        const requestId = String(++nextRequestId.current);
+        requests.current.set(requestId, scope);
+        payload = JSON.stringify({ requestId, command });
+      } else {
+        legacyCommands.current.push({ scope, matches, command: command.split(' ', 1)[0], sentAt: performance.now() });
+      }
+      if (scope === 'SOLO') {
+        setGame(game => ({ ...game, startingSolo: true, actionErrors: { ...game.actionErrors, SOLO: undefined } }));
+      } else if (scope === 'LEADERBOARD') {
+        setGame(game => ({ ...game, leaderboard: null, actionErrors: { ...game.actionErrors, LEADERBOARD: undefined } }));
+      } else if (scope !== 'WORK' && scope !== 'LOAN' && scope !== 'LEAVE' && scope !== 'CHAT') {
         setGame(game => game.actionErrors[scope]
           ? { ...game, actionErrors: { ...game.actionErrors, [scope]: undefined } } : game);
       }
     }
-    socket.current.send(command);
+    socket.current.send(payload);
     return true;
   }, []);
 
@@ -160,9 +215,10 @@ export function useGame() {
     let youLabel;
 
     function connect() {
+      requestIds.current = false;
       const connection = socket.current = new WebSocket(url);
-      connection.onopen = () => {
-        if (stopped) return;
+      let restoringAccount = false;
+      function restoreSeat() {
         const seat = savedSeat();
         resuming = Boolean(seat);
         if (seat) connection.send('RESUME ' + seat.code + ' ' + seat.token);
@@ -170,6 +226,18 @@ export function useGame() {
           ...game, connected: !seat,
           status: seat ? '자리로 돌아가는 중…' : '방을 만들거나 초대 코드로 입장하세요.',
         }));
+      }
+      connection.onopen = () => {
+        if (stopped) return;
+        const token = readLoginToken();
+        if (!token) {
+          setGame(game => ({ ...game, account: null }));
+          restoreSeat();
+          return;
+        }
+        restoringAccount = true;
+        setGame(game => ({ ...game, connected: false, status: '로그인 확인 중…' }));
+        connection.send('AUTOLOGIN ' + token);
       };
       connection.onmessage = event => {
         if (stopped) return;
@@ -178,15 +246,50 @@ export function useGame() {
           voiceSignals.current?.(message);
           return;
         }
+        if (message.type === 'hello') {
+          requestIds.current = message.requestIds === true;
+          return;
+        }
+        if (message.type === 'ack') {
+          requests.current.delete(message.requestId);
+          return;
+        }
+
         const receivedAt = performance.now();
-        const pending = pendingCommands.current;
+        if (restoringAccount &&
+            (message.type === 'profile' || message.type === 'profileFailed' || message.type === 'error')) {
+          restoringAccount = false;
+          if (message.type !== 'profile') {
+            saveLoginToken(null);
+            message = { ...message, type: 'profileFailed' };
+          }
+          const identity = message;
+          setGame(game => reduce(game, identity, receivedAt));
+          restoreSeat();
+          return;
+        }
+        if (message.type === 'profile' && message.token) saveLoginToken(message.token);
+        if (message.type === 'loggedOut' || message.type === 'guest') saveLoginToken(null);
+
+        const pending = legacyCommands.current;
         while (pending.length && receivedAt - pending[0].sentAt >= 15000) pending.shift();
         if (message.type === 'error') {
-          const scope = pending.shift()?.scope ?? 'GENERAL';
-          message = { ...message, scope, type: scope === 'WORK' ? 'workError' : 'error' };
-          if (resuming && !pending.length) {
+          if (message.command === 'RESUME' || (resuming && !requestIds.current && !message.command && !pending.length)) {
             resuming = false;
             message = { ...message, type: 'resumeFailed' };
+          } else {
+            let scope;
+            if (message.requestId !== undefined) {
+              scope = requests.current.get(message.requestId);
+              if (!scope) return;
+              requests.current.delete(message.requestId);
+            } else if (message.command === 'MIC' || message.command === 'VOICE SIGNAL') {
+              scope = 'VOICE';
+            } else {
+              const index = message.command ? pending.findIndex(request => request.command === message.command) : 0;
+              if (index >= 0) scope = pending.splice(index, 1)[0]?.scope;
+            }
+            message = { ...message, scope: scope ?? 'GENERAL', type: scope === 'WORK' ? 'workError' : 'error' };
           }
         } else {
           const index = pending.findIndex(request => request.matches(message, youLabel));
@@ -214,7 +317,8 @@ export function useGame() {
           }
         }
         if (message.type === 'closed' || message.type === 'resumeFailed') {
-          pendingCommands.current = [];
+          requests.current.clear();
+          legacyCommands.current = [];
           sessionStorage.removeItem(seatKey);
           office.current = null;
         }
@@ -259,11 +363,12 @@ export function useGame() {
         });
       };
       connection.onclose = () => {
-        pendingCommands.current = [];
+        requests.current.clear();
+        legacyCommands.current = [];
         if (stopped) return;
         const retry = savedSeat() && !replaced && retries < 30;
         setGame(game => ({
-          ...game, connected: false, popup: null,
+          ...game, connected: false, popup: null, startingSolo: false,
           status: retry ? '연결이 끊겼습니다. 다시 연결하는 중…'
             : replaced ? game.status : '연결이 끊겼습니다. 새로고침해 다시 접속하세요.',
         }));
@@ -277,7 +382,8 @@ export function useGame() {
       clearTimeout(retryTimer);
       clearTimeout(popupTimer);
       clearTimeout(noticeTimer);
-      pendingCommands.current = [];
+      requests.current.clear();
+      legacyCommands.current = [];
       socket.current?.close();
     };
   }, [send]);

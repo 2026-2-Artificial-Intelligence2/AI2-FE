@@ -20,21 +20,21 @@ function levelOf(analyser, samples) {
   return Math.sqrt(sum / samples.length);
 }
 
-/** 소리 크기(0~100). use-microphone.js와 같은 계산: -60dB → 0, -10dB → 100. */
+/** 소리 크기(0~100): -60dB → 0, -10dB → 100. */
 function micLevel(rms) {
   const db = 20 * Math.log10(Math.max(rms, 1e-6));
   return Math.max(0, Math.min(100, Math.round((db + 60) * 2)));
 }
 
-/**
- * @param shareLevel 음성 참여 중 소리 크기(MIC)도 같은 마이크로 보낼지. '내 마이크 켜기'로 따로 보내는 중이면 false.
- */
-export function useVoice({ game, send, signals, shareLevel = true }) {
+export function useVoice({ game, send, signals }) {
   const room = game.room;
   const connected = game.connected;
   const you = room?.youLabel;
   const solo = Boolean(room?.solo);
   const members = room?.members;
+  const joinRequest = useRef(null);
+  const connection = useRef(null);
+  connection.current = { connected, roomCode: room?.code, solo };
   const local = useRef(null);            // { stream, context, analyser }
   const peers = useRef(new Map());       // label → { pc, audio, analyser, pending }
   const volumes = useRef(new Map());     // label → 0~1, 다시 연결돼도 유지한다
@@ -120,13 +120,18 @@ export function useVoice({ game, send, signals, shareLevel = true }) {
   }, [signal, attachAudio, refresh]);
 
   const leave = useCallback((notify = true) => {
+    joinRequest.current = null;
+    setRequesting(false);
     for (const label of [...peers.current.keys()]) closePeer(label);
     const current = local.current;
     local.current = null;
     if (current) {
       current.stream.getTracks().forEach(track => track.stop());
       void current.context.close().catch(() => {});
-      if (notify) send('VOICE LEAVE');
+      if (notify) {
+        send('MIC OFF');
+        send('VOICE LEAVE');
+      }
     }
     setJoined(false);
     setMuted(false);
@@ -135,38 +140,57 @@ export function useVoice({ game, send, signals, shareLevel = true }) {
   }, [closePeer, send]);
 
   async function join(stream) {
-    if (local.current || requesting || !connected || !room || solo) return;
+    if (local.current || joinRequest.current || !connected || !room || solo) return;
+    const request = Symbol();
+    joinRequest.current = request;
     setRequesting(true);
     setError('');
+    let media;
+    let context;
     try {
       if (!stream && !navigator.mediaDevices?.getUserMedia) throw new Error('HTTPS 또는 localhost에서만 음성 대화를 할 수 있어요.');
-      const media = stream ?? await navigator.mediaDevices.getUserMedia({
+      media = stream ?? await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
-      const context = new AudioContext();
+      const current = connection.current;
+      if (joinRequest.current !== request || current.roomCode !== room.code || current.solo || !current.connected) {
+        media.getTracks().forEach(track => track.stop());
+        return;
+      }
+      context = new AudioContext();
       // 참여 버튼을 누른 이 순간에 소리 장치를 깨워 둔다(휴대폰은 나중에 깨우면 막힐 수 있다).
       void context.resume().catch(() => {});
       const analyser = context.createAnalyser();
       analyser.fftSize = 512;
       context.createMediaStreamSource(media).connect(analyser);
+      if (!send('VOICE JOIN')) throw new Error('연결이 끊겼어요. 다시 연결된 뒤 음성에 참여해 주세요.');
       local.current = { stream: media, context, analyser };
       watchTrack(media);
       setJoined(true);
       setMuted(false);
-      send('VOICE JOIN');
     } catch (failure) {
-      setError(failure.name === 'NotAllowedError' ? '브라우저에서 마이크 권한을 허용해 주세요.' : failure.message);
+      media?.getTracks().forEach(track => track.stop());
+      if (context) void context.close().catch(() => {});
+      if (joinRequest.current === request) {
+        setError(failure.name === 'NotAllowedError' ? '브라우저에서 마이크 권한을 허용해 주세요.' : failure.message);
+      }
     } finally {
-      setRequesting(false);
+      if (joinRequest.current === request) {
+        joinRequest.current = null;
+        setRequesting(false);
+      }
     }
   }
 
   /** 마이크 트랙이 멈추거나 다시 살아나는 것을 지켜본다. 끝나 버리면(ended) 다시 잡기를 권한다. */
   function watchTrack(media) {
     for (const track of media.getAudioTracks()) {
-      track.addEventListener('mute', () => setMicStalled(true));
-      track.addEventListener('unmute', () => setMicStalled(false));
-      track.addEventListener('ended', () => setMicStalled(true), { once: true });
+      const update = stalled => {
+        if (local.current?.stream === media) setMicStalled(stalled);
+      };
+      track.addEventListener('mute', () => update(true));
+      track.addEventListener('unmute', () => update(false));
+      track.addEventListener('ended', () => update(true), { once: true });
     }
   }
 
@@ -288,27 +312,23 @@ export function useVoice({ game, send, signals, shareLevel = true }) {
 
   // 말하는 사람 표시와 내 소리 크기 보내기
   useEffect(() => {
-    if (!joined) return;
+    if (!joined || !connected) return;
     const samples = new Float32Array(512);
     let sentLevel = -1;
     const timer = setInterval(() => {
+      if (!local.current) return;
       const next = {};
-      const rms = local.current && !muted ? levelOf(local.current.analyser, samples) : 0;
-      if (you && local.current && !muted) next[you] = rms > speakingThreshold;
-      if (shareLevel) {
-        const level = micLevel(rms);
-        if (sentLevel === -1 || Math.abs(level - sentLevel) >= 3 || (level === 0 && sentLevel !== 0)) {
-          if (send('MIC ' + level)) sentLevel = level;
-        }
+      const rms = muted ? 0 : levelOf(local.current.analyser, samples);
+      if (you && !muted) next[you] = rms > speakingThreshold;
+      const level = micLevel(rms);
+      if (sentLevel === -1 || Math.abs(level - sentLevel) >= 3 || (level === 0 && sentLevel !== 0)) {
+        if (send('MIC ' + level)) sentLevel = level;
       }
       for (const [label, peer] of peers.current) next[label] = levelOf(peer.analyser, samples) > speakingThreshold;
       setSpeaking(current => JSON.stringify(current) === JSON.stringify(next) ? current : next);
     }, 150);
-    return () => {
-      clearInterval(timer);
-      if (shareLevel && sentLevel !== -1) send('MIC OFF');
-    };
-  }, [joined, muted, you, shareLevel, send]);
+    return () => clearInterval(timer);
+  }, [joined, muted, you, connected, send]);
 
   const people = (members ?? []).filter(member => member.voice).map(member => {
     const peer = peers.current.get(member.label);

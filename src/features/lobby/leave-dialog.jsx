@@ -12,7 +12,9 @@ export function LeaveDialog({ game, host, send, onDismiss }) {
     if (!connected) setRequest(null);
   }, [connected]);
 
-  const description = host ? (inRound
+  const description = room.solo
+    ? (inRound ? '진행 중인 1인 플레이가 끝나고 입장 화면으로 돌아가요.' : '입장 화면으로 돌아가요.')
+    : host ? (inRound
     ? '방을 나가면 참가자 모두의 게임이 즉시 종료돼요.'
     : '방을 나가면 방이 닫히고 다른 참가자도 입장 화면으로 돌아가요.')
     : (inRound ? '방을 나가면 이번 판의 순위에서 제외되고 같은 자리로 돌아올 수 없어요.'
