@@ -97,7 +97,7 @@ export function SettingsPanel({ theme, onToggleTheme }) {
             onChange={event => updateSound({ footstepHint: event.target.checked })} />
           <span>
             <span className="block font-semibold">화면에 발소리 표시</span>
-            <span className="block text-xs text-ui-secondary">부장님이 가까이 걸어오면 컴퓨터 화면 아래쪽에 방향을 보여 줘요.</span>
+            <span className="block text-xs text-ui-secondary">부장님이 내 뒤쪽으로 가까이 오면 컴퓨터 화면 아래쪽에 왼쪽 뒤·바로 뒤·오른쪽 뒤를 보여 줘요.</span>
           </span>
         </label>
       </section>
