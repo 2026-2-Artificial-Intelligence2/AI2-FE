@@ -1,7 +1,27 @@
 import React, { useState } from 'react';
-import { clock, number, won } from '../../shared/format.js';
+import { clock, number, signed, won } from '../../shared/format.js';
 
 const playerLabel = (player, you) => player === you ? player + ' (나)' : player;
+const percent = value => signed(value, v => v.toFixed(2) + '%');
+/** 수익은 빨강, 손해는 파랑(국내 증시 관례). 0이면 기본 글자색. */
+const movement = value => value > 0 ? 'text-rose-700 dark:text-[var(--dark-up)]'
+  : value < 0 ? 'text-blue-700 dark:text-[var(--dark-down)]' : 'text-ui-secondary';
+const arrow = value => value > 0 ? '▲ ' : value < 0 ? '▼ ' : '';
+const medals = { 1: '🥇', 2: '🥈', 3: '🥉' };
+
+/** 출근 자금 대비 손익. 서버가 출근 자금을 보내지 않으면(구버전) null. */
+function profitOf(row, startingCashWon) {
+  if (!(startingCashWon > 0)) return null;
+  const amount = row.netWorthWon - startingCashWon;
+  return { won: amount, percent: amount / startingCashWon * 100 };
+}
+
+function Profit({ profit, className = '' }) {
+  if (!profit) return null;
+  return <span className={'tabular-nums ' + movement(profit.won) + ' ' + className}>
+    {arrow(profit.won)}{signed(profit.won, won)} <span className="font-semibold">({percent(profit.percent)})</span>
+  </span>;
+}
 
 function RankBadge({ rank }) {
   return <span data-rank={rank} className="result-rank grid size-10 shrink-0 place-items-center rounded-xl text-sm font-extrabold tabular-nums">
@@ -9,25 +29,29 @@ function RankBadge({ rank }) {
   </span>;
 }
 
-function PlayerResult({ row, you, selected, onSelect, scale }) {
+function PlayerResult({ row, you, selected, onSelect, scale, profit }) {
   const barWidth = Math.abs(row.netWorthWon) / scale.max * (scale.hasNegative ? 50 : 100);
   const positive = row.netWorthWon >= 0;
   const barStart = scale.hasNegative ? (positive ? 50 : 50 - barWidth) : 0;
-  return <button type="button" className="result-player grid w-full gap-3 rounded-xl border border-ui-border bg-ui-subtle p-3.5 text-left hover:bg-ui-muted"
+  const tone = profit ? (profit.won > 0 ? 'up' : profit.won < 0 ? 'down' : 'flat') : (positive ? 'up' : 'down');
+  return <button type="button" data-rank={row.rank} className="result-player relative grid w-full gap-3 rounded-xl border border-ui-border bg-ui-subtle p-3.5 text-left hover:bg-ui-muted"
     aria-pressed={selected} aria-controls="settlement-details" onClick={() => onSelect(row.player)}>
+    {row.rank === 1 && <span className="result-crown" aria-hidden="true">👑</span>}
     <span className="flex min-w-0 items-start gap-3">
       <RankBadge rank={row.rank} />
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
           <span className="font-bold [overflow-wrap:anywhere]">{playerLabel(row.player, you)}</span>
-          {row.bankrupt && <span className="text-xs font-semibold text-rose-700 dark:text-rose-300">파산</span>}
+          {medals[row.rank] && <span aria-hidden="true">{medals[row.rank]}</span>}
+          {row.bankrupt && <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs font-semibold text-blue-900 dark:bg-blue-950 dark:text-blue-200">파산</span>}
         </span>
         <span className="mt-0.5 block text-xs text-ui-secondary">최종 순자산</span>
         <span className="block text-lg font-extrabold tabular-nums [overflow-wrap:anywhere]">{won(row.netWorthWon)}</span>
+        <Profit profit={profit} className="block text-sm font-bold" />
       </span>
     </span>
     <span className="result-comparison relative block h-1.5 rounded-full bg-ui-track" aria-hidden="true">
-      <span className={'absolute inset-y-0 rounded-full ' + (positive ? 'result-bar-positive' : 'result-bar-negative')}
+      <span data-tone={tone} className="result-bar absolute inset-y-0 rounded-full"
         style={{ insetInlineStart: barStart + '%', inlineSize: barWidth + '%' }} />
       {scale.hasNegative && <span className="result-bar-zero absolute inset-y-0 left-1/2 w-px" />}
     </span>
@@ -44,9 +68,10 @@ function PlayerResult({ row, you, selected, onSelect, scale }) {
   </button>;
 }
 
-function SettlementDetails({ row, you, name }) {
+function SettlementDetails({ row, you, name, startingCashWon }) {
   const holdings = Object.entries(row.holdings);
   const [loan, margin] = [row.loanRepayWon ?? 0, row.marginDebtWon ?? 0];
+  const profit = profitOf(row, startingCashWon);
   const amounts = [
     ['현금', row.cashWon],
     ['보유 주식 청산가', row.stockValueWon],
@@ -59,12 +84,16 @@ function SettlementDetails({ row, you, name }) {
     <dl className="mt-4 divide-y divide-ui-border text-sm tabular-nums">
       {amounts.map(([label, amount]) => <div key={label} className="flex justify-between gap-3 py-2.5">
         <dt className="text-ui-secondary">{label}</dt>
-        <dd className={amount < 0 ? 'font-semibold text-blue-800 dark:text-blue-200' : 'font-semibold'}>{won(amount)}</dd>
+        <dd className={'font-semibold ' + (amount < 0 ? movement(amount) : '')}>{won(amount)}</dd>
       </div>)}
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 rounded-lg bg-ui-muted px-3 py-3">
         <dt className="font-semibold">최종 순자산</dt>
         <dd className="text-lg font-extrabold [overflow-wrap:anywhere]">{won(row.netWorthWon)}</dd>
       </div>
+      {profit && <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-2.5">
+        <dt className="text-ui-secondary">출근 자금 {won(startingCashWon)} 대비</dt>
+        <dd className="font-bold"><Profit profit={profit} /></dd>
+      </div>}
     </dl>
     <p className="mt-4 text-xs leading-relaxed text-ui-secondary">
       주식 청산가는 퇴근 시점에 보유 주식을 전부 팔았을 때 받을 금액이에요.
@@ -93,35 +122,77 @@ function TradeLog({ trades, you, name }) {
         <thead><tr>{['근무 경과', '직원', '종목', '구분', '수량', '체결 금액'].map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead>
         <tbody id="trades">{rows.map((trade, index) => <tr key={index}>
           <td>{clock(trade.second)}</td><td>{playerLabel(trade.player, you)}</td><td>{name(trade.symbol)}</td>
-          <td>{trade.side}</td><td>{number(trade.quantity)}주</td><td>{won(trade.amountWon)}</td>
+          <td className={'font-semibold ' + movement(trade.side.endsWith('매수') ? 1 : -1)}>{trade.side}</td>
+          <td>{number(trade.quantity)}주</td><td>{won(trade.amountWon)}</td>
         </tr>)}</tbody>
       </table>
     </div> : <p className="mt-4 rounded-lg border border-dashed border-ui-border bg-ui-subtle px-4 py-5 text-center text-sm text-ui-secondary">{mineOnly ? '내 거래가 없었어요.' : '이번 판에는 거래가 없었어요.'}</p>}
   </section>;
 }
 
+/** 1등 화면에 한 번 쏟아지는 꽃가루. 움직임 줄이기 설정이면 CSS에서 숨긴다. */
+const confetti = Array.from({ length: 36 }, (_, index) => ({
+  left: (index * 37 % 100) + Math.random() * 3,
+  delay: (index % 9) * 0.12 + Math.random() * 0.3,
+  duration: 2.4 + Math.random() * 1.4,
+  drift: (Math.random() - 0.5) * 120,
+  spin: 360 + Math.random() * 540,
+  color: ['#f5445a', '#f5b82e', '#4491ff', '#22b07d', '#a66cff'][index % 5],
+  round: index % 3 === 0,
+}));
+
+function Confetti() {
+  return <div className="result-confetti" aria-hidden="true">
+    {confetti.map((piece, index) => <i key={index} data-round={piece.round} style={{
+      left: piece.left + '%', background: piece.color, animationDelay: piece.delay + 's', animationDuration: piece.duration + 's',
+      '--drift': piece.drift + 'px', '--spin': piece.spin + 'deg',
+    }} />)}
+  </div>;
+}
+
+function headline({ mine, winners, solo, profit }) {
+  if (!mine) return { title: '퇴근 · 최종 정산' };
+  if (solo) {
+    if (mine.bankrupt) return { title: '파산 퇴근…', sub: '다음엔 부장님 몰래 조금만 덜 걸어 봐요.' };
+    if (profit?.won > 0) return { title: '수익 내고 퇴근!', sub: '오늘 장사 잘했어요. 명예의 전당을 노려 봐요.', celebrate: true };
+    return { title: '퇴근 · 최종 정산', sub: profit?.won < 0 ? '오늘은 시장이 야속했어요.' : undefined };
+  }
+  if (mine.rank === 1) return {
+    title: winners.length > 1 ? '공동 퇴근왕!' : '오늘의 퇴근왕!',
+    sub: '부장님 몰래 누구보다 많이 불렸어요. 축하해요!', celebrate: true,
+  };
+  return { title: '퇴근 · 최종 정산', sub: mine.rank + '위로 퇴근했어요. 다음 판엔 왕관을 노려 봐요!' };
+}
+
 export function Results({ result, name, host, solo, connected, send, restartError }) {
-  const { standings, trades, you } = result;
+  const { standings, trades, you, startingCashWon } = result;
   const [selected, setSelected] = useState(you);
   const mine = standings.find(row => row.player === you);
   const viewed = standings.find(row => row.player === selected) ?? mine ?? standings[0];
   const winners = standings.filter(row => row.rank === 1);
+  const myProfit = mine && profitOf(mine, startingCashWon);
+  const { title, sub, celebrate } = headline({ mine, winners, solo, profit: myProfit });
   const scale = {
     max: Math.max(1, ...standings.map(row => Math.abs(row.netWorthWon))),
     hasNegative: standings.some(row => row.netWorthWon < 0),
   };
 
   return <section id="results" className="mx-auto max-w-6xl space-y-4" aria-labelledby="results-title">
-    <header className="panel results-summary relative isolate overflow-hidden px-5 py-6 sm:px-8 sm:py-8">
+    <header data-celebrate={Boolean(celebrate)} className="panel results-summary relative isolate overflow-hidden px-5 py-6 sm:px-8 sm:py-8">
+      {celebrate && <Confetti />}
       <div className="relative flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h2 id="results-title" className="text-2xl font-extrabold tracking-tight sm:text-3xl">퇴근 · 최종 정산</h2>
-          {winners.length > 0 && <p className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm text-ui-secondary">
-            <span data-rank="1" className="result-rank shrink-0 rounded-full px-3 py-1 text-xs font-bold">
-              {winners.length > 1 ? '공동 1위' : '1위'}
-            </span>
-            <span className="min-w-0 font-medium [overflow-wrap:anywhere]">{winners.map(row => playerLabel(row.player, you)).join(', ')}</span>
-          </p>}
+        <div className="flex min-w-0 items-center gap-4">
+          {celebrate && <span className="result-trophy grid size-16 shrink-0 place-items-center rounded-2xl text-4xl sm:size-20 sm:text-5xl" aria-hidden="true">🏆</span>}
+          <div className="min-w-0">
+            <h2 id="results-title" className="results-title text-2xl font-extrabold tracking-tight sm:text-3xl">{title}</h2>
+            {sub && <p className="mt-1 text-sm leading-relaxed break-keep text-ui-secondary">{sub}</p>}
+            {!solo && winners.length > 0 && <p className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm text-ui-secondary">
+              <span data-rank="1" className="result-rank shrink-0 rounded-full px-3 py-1 text-xs font-bold">
+                👑 {winners.length > 1 ? '공동 1위' : '1위'}
+              </span>
+              <span className="min-w-0 font-semibold text-ui-text [overflow-wrap:anywhere]">{winners.map(row => playerLabel(row.player, you)).join(', ')}</span>
+            </p>}
+          </div>
         </div>
         {host && <div className="space-y-2">
           <button id="restart" className="primary-action rounded-lg px-4 py-2.5 text-sm font-bold"
@@ -136,11 +207,16 @@ export function Results({ result, name, host, solo, connected, send, restartErro
         <div className="col-span-full min-w-0 sm:col-auto">
           <dt className="text-sm font-semibold text-ui-secondary">내 최종 순자산</dt>
           <dd className="results-net-worth mt-1 leading-tight font-extrabold tracking-tight [overflow-wrap:anywhere]">{won(mine.netWorthWon)}</dd>
+          {myProfit && <dd className="mt-1 text-base font-bold sm:text-lg">
+            <span className="mr-1.5 text-sm font-semibold text-ui-secondary">출근 때보다</span>
+            <Profit profit={myProfit} />
+          </dd>}
         </div>
         <div className="min-w-0 rounded-xl border border-ui-border bg-ui-surface px-3 py-2.5 sm:px-4">
           <dt className="text-sm text-ui-secondary">내 순위</dt>
           <dd className="mt-1 flex flex-wrap items-center gap-x-2 text-xl font-extrabold">
-            {mine.rank}위 {mine.bankrupt && <span className="rounded bg-rose-100 px-1.5 py-0.5 text-xs text-rose-900 dark:bg-rose-950 dark:text-rose-200">파산</span>}
+            {mine.rank}위{!solo && medals[mine.rank] && <span aria-hidden="true">{medals[mine.rank]}</span>}
+            {mine.bankrupt && <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-900 dark:bg-blue-950 dark:text-blue-200">파산</span>}
           </dd>
         </div>
         <div className="min-w-0 rounded-xl border border-ui-border bg-ui-surface px-3 py-2.5 sm:px-4">
@@ -160,11 +236,12 @@ export function Results({ result, name, host, solo, connected, send, restartErro
         <p className="mt-1 text-sm text-ui-secondary">직원을 선택해 정산 내역을 확인하세요.</p>
         <ol id="standings" className="mt-4 grid gap-2.5 min-[30rem]:grid-cols-2">
           {standings.map(row => <li key={row.player} className="min-w-0">
-            <PlayerResult row={row} you={you} selected={viewed?.player === row.player} onSelect={setSelected} scale={scale} />
+            <PlayerResult row={row} you={you} selected={viewed?.player === row.player} onSelect={setSelected} scale={scale}
+              profit={profitOf(row, startingCashWon)} />
           </li>)}
         </ol>
       </section>
-      {viewed && <SettlementDetails row={viewed} you={you} name={name} />}
+      {viewed && <SettlementDetails row={viewed} you={you} name={name} startingCashWon={startingCashWon} />}
     </div>
 
     <TradeLog trades={trades} you={you} name={name} />
