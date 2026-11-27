@@ -111,7 +111,7 @@ export function AccountEntry({ account, notice, actionErrors, connected, send, r
           </p>
         </div>
         {account.member
-          ? <div className="flex shrink-0 flex-col gap-1.5 min-[24rem]:flex-row">
+          ? <div className="flex shrink-0 flex-col gap-1.5">
             <button type="button" className="control text-xs" disabled={!connected}
               onClick={() => setDialog('ACCOUNT')}>내 정보</button>
             <button type="button" className="control text-xs" disabled={!connected || pending}
