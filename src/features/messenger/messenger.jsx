@@ -7,6 +7,16 @@ import { Icon, faBullhorn } from '../../shared/ui/icon.jsx';
 const group = 'ALL';
 const rumor = 'LEAK';
 
+/** 판(근무일) 사이 구분선. 같은 방에서 다시 하면 "2일 차 근무"처럼 하루씩 늘어난다. */
+function DayDivider({ round }) {
+  return <div role="separator" aria-label={round + '일 차 근무'}
+    className="my-1 flex items-center gap-2 text-[11px] font-semibold text-ui-caption">
+    <span aria-hidden="true" className="h-px flex-1 bg-ui-border" />
+    <span aria-hidden="true">{round}일 차 근무</span>
+    <span aria-hidden="true" className="h-px flex-1 bg-ui-border" />
+  </div>;
+}
+
 function Channel({ active, title, detail, marker, onSelect }) {
   return <button type="button" aria-pressed={active} onClick={onSelect}
     className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm hover:bg-ui-muted aria-pressed:bg-blue-50 dark:aria-pressed:bg-[var(--dark-selection)] aria-pressed:text-blue-950 dark:aria-pressed:text-blue-100">
@@ -50,6 +60,25 @@ export function Messenger({ game, send, playing, closing, onDismiss, docked = fa
     ? (message.from === me && message.to === selected) || (message.from === selected && message.to === me)
     : message.to === null);
   const lastVisibleId = messages.at(-1)?.id;
+  const round = game.room?.round;
+  const lastRound = messages.at(-1)?.round;
+
+  function renderMessage(message) {
+    if (message.system) return <p role="note"
+      className="mx-auto flex max-w-[95%] items-start gap-2 rounded-lg bg-amber-100 px-3 py-1.5 text-xs leading-relaxed font-semibold break-keep text-amber-950 dark:bg-amber-950 dark:text-amber-100">
+      <Icon icon={faBullhorn} className="mt-[0.2rem] shrink-0" />
+      <span className="min-w-0 [overflow-wrap:anywhere]">{message.text}
+        {message.second >= 0 && <span className="ml-1.5 font-normal whitespace-nowrap tabular-nums opacity-70">{clock(message.second)}</span>}
+      </span>
+    </p>;
+    const mine = message.from === me;
+    return <article className={mine ? 'max-w-[90%] self-end text-right' : 'max-w-[90%] self-start'}>
+      <p className="mb-1 text-xs text-ui-caption">{mine ? '나' : message.from}
+        {message.second >= 0 && <span className="ml-2 tabular-nums">{clock(message.second)}</span>}</p>
+      <p className={'inline-block max-w-full rounded-xl px-3 py-2 text-left text-sm whitespace-pre-wrap [overflow-wrap:anywhere] ' +
+        (mine ? 'bg-blue-700 text-white dark:bg-[#394251] dark:text-[#e0e4ec]' : 'bg-ui-surface text-ui-text ring-1 ring-ui-border')}>{message.text}</p>
+    </article>;
+  }
 
   useLayoutEffect(() => {
     if (list.current) list.current.scrollTop = list.current.scrollHeight;
@@ -132,19 +161,14 @@ export function Messenger({ game, send, playing, closing, onDismiss, docked = fa
           <p>{leakReceipt?.message ?? '제목과 본문을 작성하세요.'}</p>
         </div> : <div ref={list} role="log" aria-label={heading + ' 메시지'}
           className={'flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3 ' + (docked ? 'bg-ui-subtle' : 'bg-blue-50/45 dark:bg-ui-desktop')}>
-          {messages.length ? messages.map(message => {
-            if (message.system) return <p key={message.id} role="note"
-              className="mx-auto max-w-[95%] rounded-full bg-amber-100 px-3 py-1 text-center text-xs font-semibold text-amber-950 dark:bg-amber-950 dark:text-amber-100">
-              <Icon icon={faBullhorn} className="mr-1.5" />{message.text}{message.second >= 0 && <span className="ml-1.5 font-normal tabular-nums opacity-70">{clock(message.second)}</span>}
-            </p>;
-            const mine = message.from === me;
-            return <article key={message.id} className={mine ? 'max-w-[90%] self-end text-right' : 'max-w-[90%] self-start'}>
-              <p className="mb-1 text-xs text-ui-caption">{mine ? '나' : message.from}
-                {message.second >= 0 && <span className="ml-2 tabular-nums">{clock(message.second)}</span>}</p>
-              <p className={'inline-block max-w-full rounded-xl px-3 py-2 text-left text-sm whitespace-pre-wrap [overflow-wrap:anywhere] ' +
-                (mine ? 'bg-blue-700 text-white dark:bg-[#394251] dark:text-[#e0e4ec]' : 'bg-ui-surface text-ui-text ring-1 ring-ui-border')}>{message.text}</p>
-            </article>;
-          }) : <p className="m-auto text-sm text-ui-caption">아직 대화가 없습니다.</p>}
+          {messages.length ? messages.map((message, index) => {
+            // 앞 메시지와 판이 다르면 그 사이에 구분선을 긋는다.
+            const previousRound = messages[index - 1]?.round;
+            const divider = previousRound && message.round && message.round !== previousRound
+              ? <DayDivider round={message.round} /> : null;
+            return <React.Fragment key={message.id}>{divider}{renderMessage(message)}</React.Fragment>;
+          }).concat(round && lastRound && round > lastRound ? [<DayDivider key="today" round={round} />] : [])
+            : <p className="m-auto text-sm text-ui-caption">아직 대화가 없습니다.</p>}
         </div>}
         <form onSubmit={submit} className="shrink-0 space-y-2 border-t border-ui-border p-2.5">
           {anonymous && <label className="block text-xs font-semibold text-ui-secondary">

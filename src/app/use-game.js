@@ -93,6 +93,7 @@ function reduce(game, message, receivedAt) {
       const sameRound = sameRoom && game.room.round === message.round;
       return {
         ...(message.room.startedAt ? game : {
+          // 메신저 기록은 같은 방이면 판이 바뀌어도 남긴다(판 사이에는 메신저가 구분선을 긋는다).
           ...initial, chats: sameRoom ? game.chats : [],
           account: game.account, accountNotice: game.accountNotice,
           micLevels: sameRoom ? game.micLevels : undefined,
