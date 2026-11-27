@@ -191,7 +191,7 @@ function headline({ mine, winners, solo, profit }) {
     return { title: '퇴근 · 최종 정산', sub: profit?.won < 0 ? '오늘은 시장이 야속했어요.' : undefined };
   }
   if (mine.rank === 1) return {
-    title: winners.length > 1 ? '공동 퇴근왕!' : '오늘의 퇴근왕!',
+    title: winners.length > 1 ? '공동 주식왕!' : '오늘의 주식왕!',
     sub: '부장님 몰래 누구보다 많이 불렸어요. 축하해요!', celebrate: true,
   };
   return { title: '퇴근 · 최종 정산', sub: mine.rank + '위로 퇴근했어요. 다음 판엔 왕관을 노려 봐요!' };
