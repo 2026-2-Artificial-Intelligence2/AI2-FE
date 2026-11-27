@@ -7,7 +7,7 @@ const WHERE = ['앞', '오른쪽 앞', '오른쪽', '오른쪽 뒤', '뒤', '왼
 
 /**
  * 부장님 발소리가 어디서 나는지(내 자리 기준 방향·거리). 발소리와 같은 정보만 보여 준다:
- * 부장님이 걷는 동안만 뜨고, 누구에게 가는지는 알려주지 않는다.
+ * 부장님이 걷는 동안, 가까이(옆자리 거리 안) 왔을 때만 뜨고, 누구에게 가는지는 알려주지 않는다.
  */
 export function describeStep(step) {
   const { to, listener } = step;
@@ -22,12 +22,13 @@ export function describeStep(step) {
   return { arrow: ARROWS[sector], where: WHERE[sector], near };
 }
 
-const nearLabel = { close: '바로 근처', near: '가까워요', far: '멀리' };
+const nearLabel = { close: '바로 근처', near: '가까워요' };
 
 export function BossNearby({ market }) {
   const { footstepHint } = useSoundSettings();
   if (!footstepHint || !market?.walking || !market.step) return null;
   const { arrow, where, near } = describeStep(market.step);
+  if (near === 'far') return null;
   return <div role="status" aria-label={'부장님 발소리 ' + where + ' ' + nearLabel[near]} data-near={near}
     className="boss-nearby pointer-events-none fixed bottom-6 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-bold shadow-lg">
     <span aria-hidden="true" className="text-base">👞</span>

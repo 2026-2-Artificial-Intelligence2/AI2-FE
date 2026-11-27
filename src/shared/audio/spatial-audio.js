@@ -9,6 +9,7 @@ let audio;
 let output;    // 전체
 let effects;   // 체결·알림·업무·정산
 let boss;      // 부장님 발소리·헛기침·복귀
+let music;     // 배경음악(music.js가 쓴다)
 
 /** 파일 이름 → 맞출 최대 크기(0~1). 같은 소리의 변형은 -1, -2로 이어 붙인다. */
 const FILES = {
@@ -30,8 +31,10 @@ export function enableSound() {
     output = audio.createGain();
     effects = audio.createGain();
     boss = audio.createGain();
+    music = audio.createGain();
     effects.connect(output);
     boss.connect(output);
+    music.connect(output);
     output.connect(audio.destination);
     applyLevels(soundSettings());
     subscribeSound(applyLevels);
@@ -45,9 +48,15 @@ const ready = () => audio?.state === 'running';
 /** 설정을 바꾸면 끊김 없이 0.05초에 걸쳐 크기를 맞춘다. */
 function applyLevels(settings) {
   const t = audio.currentTime;
-  for (const [node, channel] of [[output, 'master'], [effects, 'effects'], [boss, 'boss']]) {
+  for (const [node, channel] of [[output, 'master'], [effects, 'effects'], [boss, 'boss'], [music, 'music']]) {
     node.gain.setTargetAtTime(channelLevel(settings, channel), t, 0.015);
   }
+}
+
+/** 배경음악을 소리 갈래(음악)에 잇는다. 소리를 켠 뒤에만 쓸 수 있다. */
+export function musicInput() {
+  enableSound();
+  return { context: audio, input: music };
 }
 
 /** 설정 창에서 막대를 움직일 때 들려주는 소리. */
@@ -57,7 +66,7 @@ export function previewSound(channel) {
     const step = buffers.get('boss-footstep');
     if (step) playBuffer(step, { dest: boss });
     else tone({ freq: 120, to: 55, decay: 0.15, gain: 0.3, dest: boss });
-  } else if (channel !== 'voice') sfx.buy();
+  } else if (channel !== 'voice' && channel !== 'music') sfx.buy();
 }
 
 async function loadFiles() {

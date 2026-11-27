@@ -6,6 +6,7 @@ const channels = [
   { id: 'master', label: '전체 음량', hint: '모든 소리' },
   { id: 'effects', label: '효과음', hint: '체결·알림·업무·정산' },
   { id: 'boss', label: '부장님 소리', hint: '발소리·헛기침·문 소리' },
+  { id: 'music', label: '배경음악', hint: '근무 중 사무실 음악' },
   { id: 'voice', label: '음성 채팅', hint: '동료 목소리 전체' },
 ];
 
@@ -95,7 +96,7 @@ export function SettingsPanel({ theme, onToggleTheme }) {
             onChange={event => updateSound({ footstepHint: event.target.checked })} />
           <span>
             <span className="block font-semibold">화면에 발소리 표시</span>
-            <span className="block text-xs text-ui-secondary">부장님이 걷는 동안 컴퓨터 화면 아래쪽에 방향과 거리를 보여 줘요.</span>
+            <span className="block text-xs text-ui-secondary">부장님이 가까이 걸어오면 컴퓨터 화면 아래쪽에 방향을 보여 줘요.</span>
           </span>
         </label>
       </section>

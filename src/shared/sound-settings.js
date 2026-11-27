@@ -4,12 +4,12 @@ import { useSyncExternalStore } from 'react';
 const key = 'office-stock-sound';
 
 /** 소리 갈래. master는 나머지 모두에 곱해진다. */
-export const SOUND_CHANNELS = ['master', 'effects', 'boss', 'voice'];
+export const SOUND_CHANNELS = ['master', 'effects', 'boss', 'music', 'voice'];
 
 const defaults = {
-  master: 0.8, effects: 1, boss: 1, voice: 1,
+  master: 0.8, effects: 1, boss: 1, music: 0.5, voice: 1,
   footstepHint: true,   // 컴퓨터 화면에 부장님 발소리 방향 표시
-  muted: { master: false, effects: false, boss: false, voice: false },
+  muted: { master: false, effects: false, boss: false, music: false, voice: false },
 };
 
 function load() {

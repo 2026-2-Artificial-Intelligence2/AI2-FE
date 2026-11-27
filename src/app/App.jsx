@@ -7,6 +7,7 @@ import { SettingsPanel } from './settings-panel.jsx';
 import { BossNearby } from './boss-nearby.jsx';
 import { GameGauges } from './game-gauges.jsx';
 import { enableSound, sfx } from '../shared/audio/spatial-audio.js';
+import { duckMusic, setOfficeMusic } from '../shared/audio/music.js';
 import { clock } from '../shared/format.js';
 import { Market } from '../features/market/market.jsx';
 import { Work } from '../features/work/work.jsx';
@@ -42,6 +43,12 @@ export function App() {
   useEffect(() => {
     if (import.meta.env.DEV) window.officeVoice = voice;
   });
+  // 근무 중(출근부터 퇴근까지)에만 사무실 음악. 부장님이 걷는 동안은 발소리가 묻히지 않게 줄인다.
+  const musicOn = Boolean(room?.room.startedAt && !result && connected);
+  useEffect(() => { setOfficeMusic(musicOn); }, [musicOn]);
+  useEffect(() => () => setOfficeMusic(false), []);
+  const bossWalking = Boolean(market?.walking);
+  useEffect(() => { duckMusic(bossWalking); }, [bossWalking]);
   // 버튼을 누르면 작은 클릭음. 브라우저는 사용자가 누른 뒤에야 소리를 허락하므로 이때 소리도 켠다.
   useEffect(() => {
     const onClick = event => {
