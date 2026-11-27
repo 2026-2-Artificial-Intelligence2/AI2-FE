@@ -3,8 +3,11 @@ import { useGame } from './use-game.js';
 import { useTheme } from './use-theme.js';
 import { useVoice } from './use-voice.js';
 import { VoicePanel } from './voice-panel.jsx';
+import { SettingsPanel } from './settings-panel.jsx';
+import { BossNearby } from './boss-nearby.jsx';
 import { GameGauges } from './game-gauges.jsx';
 import { enableSound, sfx } from '../shared/audio/spatial-audio.js';
+import { duckMusic, setOfficeMusic } from '../shared/audio/music.js';
 import { clock } from '../shared/format.js';
 import { Market } from '../features/market/market.jsx';
 import { Work } from '../features/work/work.jsx';
@@ -40,6 +43,12 @@ export function App() {
   useEffect(() => {
     if (import.meta.env.DEV) window.officeVoice = voice;
   });
+  // 근무 중(출근부터 퇴근까지)에만 사무실 음악. 부장님이 걷는 동안은 발소리가 묻히지 않게 줄인다.
+  const musicOn = Boolean(room?.room.startedAt && !result && connected);
+  useEffect(() => { setOfficeMusic(musicOn); }, [musicOn]);
+  useEffect(() => () => setOfficeMusic(false), []);
+  const bossWalking = Boolean(market?.walking);
+  useEffect(() => { duckMusic(bossWalking); }, [bossWalking]);
   // 버튼을 누르면 작은 클릭음. 브라우저는 사용자가 누른 뒤에야 소리를 허락하므로 이때 소리도 켠다.
   useEffect(() => {
     const onClick = event => {
@@ -201,11 +210,7 @@ export function App() {
         <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 border-b border-ui-border pb-4 sm:flex sm:flex-wrap">
           <h1 className="text-lg font-extrabold tracking-tight">부장님 몰래</h1>
           <div className="flex items-center gap-2 text-sm sm:ml-auto">
-            <button type="button" className="control grid size-11 place-items-center p-0 text-base sm:block sm:size-auto sm:px-3 sm:py-1.5 sm:text-sm"
-              aria-label="다크 모드" aria-pressed={theme === 'dark'} onClick={toggleTheme}>
-              <span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span>
-              <span aria-hidden="true" className="hidden sm:inline">{theme === 'dark' ? ' 라이트 모드' : ' 다크 모드'}</span>
-            </button>
+            <SettingsPanel theme={theme} onToggleTheme={toggleTheme} />
             {room && !solo && <VoicePanel voice={voice} connected={connected} serverError={actionErrors.VOICE?.message} />}
           </div>
           {room && !startingSolo && <div className="col-span-full flex min-w-0 items-center gap-1.5 text-sm sm:flex-wrap sm:gap-2">
@@ -244,6 +249,7 @@ export function App() {
         {market && !result && <Market visible={desktopView === 'MARKET'} active={desktopInteractive && !messengerOpen && view === 'MARKET'} game={game} name={name} gauges={gauges} loanAction={loanAction} theme={theme} send={send} />}
         {result && <Results result={result} name={name} host={host} solo={solo} connected={connected} send={send} restartError={actionErrors.RESTART?.message} />}
         {!inLobby && messenger}
+        {computer && desktopShown && <BossNearby market={market} />}
         {computer && desktopShown && <Notifications game={game} inbox={inbox} toggleInbox={toggleInbox}
           messengerOpen={messengerOpen} openMessenger={openMessenger} lastChat={lastChat} lastNews={lastNews} dismissNews={dismissNews} />}
         {activeDialog === 'loan' && showLoan &&

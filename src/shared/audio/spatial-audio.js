@@ -1,9 +1,15 @@
 // 게임 소리. 부장님 소리(발소리·헛기침·복귀)는 방향이 있고, 나머지 효과음은 가운데에서 난다.
 // 녹음 파일(public/sounds)은 처음 소리를 켤 때 불러와, 앞뒤 무음을 자르고 모노로 바꾸고 크기를 맞춘다.
 // 파일이 아직 없거나 못 불러오면 합성 소리로 대신한다. 나머지 효과음은 Web Audio로 합성한다.
+// 소리 크기: 효과음(effects)과 부장님 소리(boss)를 따로 조절하고, 둘 다 전체(output)를 거친다.
+
+import { level as channelLevel, soundSettings, subscribeSound } from '../sound-settings.js';
 
 let audio;
-let output;
+let output;    // 전체
+let effects;   // 체결·알림·업무·정산
+let boss;      // 부장님 발소리·헛기침·복귀
+let music;     // 배경음악(music.js가 쓴다)
 
 /** 파일 이름 → 맞출 최대 크기(0~1). 같은 소리의 변형은 -1, -2로 이어 붙인다. */
 const FILES = {
@@ -23,14 +29,45 @@ export function enableSound() {
   if (!audio) {
     audio = new AudioContext();
     output = audio.createGain();
-    output.gain.value = 0.8;
+    effects = audio.createGain();
+    boss = audio.createGain();
+    music = audio.createGain();
+    effects.connect(output);
+    boss.connect(output);
+    music.connect(output);
     output.connect(audio.destination);
+    applyLevels(soundSettings());
+    subscribeSound(applyLevels);
   }
   audio.resume().catch(() => {});
   loading ??= loadFiles();
 }
 
 const ready = () => audio?.state === 'running';
+
+/** 설정을 바꾸면 끊김 없이 0.05초에 걸쳐 크기를 맞춘다. */
+function applyLevels(settings) {
+  const t = audio.currentTime;
+  for (const [node, channel] of [[output, 'master'], [effects, 'effects'], [boss, 'boss'], [music, 'music']]) {
+    node.gain.setTargetAtTime(channelLevel(settings, channel), t, 0.015);
+  }
+}
+
+/** 배경음악을 소리 갈래(음악)에 잇는다. 소리를 켠 뒤에만 쓸 수 있다. */
+export function musicInput() {
+  enableSound();
+  return { context: audio, input: music };
+}
+
+/** 설정 창에서 막대를 움직일 때 들려주는 소리. */
+export function previewSound(channel) {
+  enableSound();
+  if (channel === 'boss') {
+    const step = buffers.get('boss-footstep');
+    if (step) playBuffer(step, { dest: boss });
+    else tone({ freq: 120, to: 55, decay: 0.15, gain: 0.3, dest: boss });
+  } else if (channel !== 'voice' && channel !== 'music') sfx.buy();
+}
 
 async function loadFiles() {
   await Promise.all(Object.entries(FILES).map(async ([name, peak]) => {
@@ -81,7 +118,7 @@ function pick(name) {
   return variants.length ? buffers.get(variants[Math.floor(Math.random() * variants.length)]) : null;
 }
 
-function playBuffer(buffer, { at = 0, dest = output, gain = 1, rate = 1 } = {}) {
+function playBuffer(buffer, { at = 0, dest = effects, gain = 1, rate = 1 } = {}) {
   const source = new AudioBufferSourceNode(audio, { buffer, playbackRate: rate });
   const level = new GainNode(audio, { gain });
   source.connect(level).connect(dest);
@@ -89,15 +126,28 @@ function playBuffer(buffer, { at = 0, dest = output, gain = 1, rate = 1 } = {}) 
   source.onended = () => { source.disconnect(); level.disconnect(); };
 }
 
-/** 부장님이 있는 쪽에서 들리게 하는 출력. Web Audio 듣는 이는 -Z를 보고 +X가 오른쪽이다. */
+/** 바로 뒤에서 날 때 높은 소리를 깎는 한계(Hz). 앞에서는 거의 깎지 않는다. */
+const FRONT_CUTOFF = 12000, BEHIND_CUTOFF = 1300;
+
+/**
+ * 부장님이 있는 쪽에서 들리게 하는 출력. Web Audio 듣는 이는 -Z를 보고 +X가 오른쪽이다.
+ * 이어폰의 HRTF만으로는 앞뒤가 잘 구분되지 않아, 뒤에서 나는 소리일수록 먹먹하게(높은 소리를 깎아)
+ * 들려준다. 실제로도 귀 뒤쪽에서 오는 소리는 귓바퀴에 가려 둔해진다. 이를 과장한 것이다.
+ */
 function spatial({ x, z, y = -1, at = 0 }, listener) {
+  const ahead = listener.forwardZ * z;   // 듣는 이 기준 앞(+)·뒤(−) 거리
+  const distance = Math.hypot(x, z) || 1;
+  const behind = Math.max(0, -ahead / distance);   // 0 = 옆이나 앞, 1 = 바로 뒤
+  const muffle = new BiquadFilterNode(audio, {
+    type: 'lowpass', Q: 0.5, frequency: FRONT_CUTOFF * Math.pow(BEHIND_CUTOFF / FRONT_CUTOFF, behind),
+  });
   const pan = new PannerNode(audio, {
     panningModel: 'HRTF', distanceModel: 'inverse', refDistance: 1,
-    positionX: -listener.forwardZ * x, positionY: y, positionZ: -listener.forwardZ * z,
+    positionX: -listener.forwardZ * x, positionY: y, positionZ: -ahead,
   });
-  pan.connect(output);
-  setTimeout(() => pan.disconnect(), (at + 4) * 1000);
-  return pan;
+  muffle.connect(pan).connect(boss);
+  setTimeout(() => { muffle.disconnect(); pan.disconnect(); }, (at + 4) * 1000);
+  return muffle;
 }
 
 export function footsteps({ from, to, listener }) {
@@ -166,7 +216,7 @@ function envelope(param, t, attack, peak, decay) {
   param.exponentialRampToValueAtTime(0.0001, t + attack + decay);
 }
 
-function tone({ type = 'sine', freq, to, at = 0, attack = 0.005, decay = 0.2, gain = 0.3, dest = output, filter }) {
+function tone({ type = 'sine', freq, to, at = 0, attack = 0.005, decay = 0.2, gain = 0.3, dest = effects, filter }) {
   const t = audio.currentTime + at;
   const osc = new OscillatorNode(audio, { type });
   osc.frequency.setValueAtTime(freq, t);
@@ -180,7 +230,7 @@ function tone({ type = 'sine', freq, to, at = 0, attack = 0.005, decay = 0.2, ga
   osc.onended = () => { osc.disconnect(); lowpass?.disconnect(); level.disconnect(); };
 }
 
-function burst({ at = 0, attack = 0.002, decay = 0.08, gain = 0.3, type = 'lowpass', freq = 1000, to, q = 1, dest = output }) {
+function burst({ at = 0, attack = 0.002, decay = 0.08, gain = 0.3, type = 'lowpass', freq = 1000, to, q = 1, dest = effects }) {
   const t = audio.currentTime + at;
   const source = noiseSource();
   const filter = new BiquadFilterNode(audio, { type, Q: q });
@@ -222,7 +272,7 @@ function brass(freq, { at = 0, length = 0.25, gain = 0.18, vibrato = 0, bend } =
   level.gain.linearRampToValueAtTime(gain, t + 0.03);
   level.gain.setValueAtTime(gain * 0.8, t + length - 0.04);
   level.gain.linearRampToValueAtTime(0.0001, t + length + 0.12);
-  osc.connect(filter).connect(level).connect(output);
+  osc.connect(filter).connect(level).connect(effects);
   osc.start(t);
   osc.stop(t + length + 0.2);
   osc.onended = () => { osc.disconnect(); filter.disconnect(); level.disconnect(); lfo?.disconnect(); };
@@ -233,9 +283,9 @@ const C5 = 72, E5 = 76, G5 = 79, C6 = 84;
 const between = (a, b) => a + Math.random() * (b - a);
 
 /** 녹음 파일이 있으면 그것을, 없으면 합성 소리를 낸다. */
-function recordedOr(name, synth) {
+function recordedOr(name, synth, dest = effects) {
   const buffer = pick(name);
-  if (buffer) playBuffer(buffer);
+  if (buffer) playBuffer(buffer, { dest });
   else synth();
 }
 
@@ -315,7 +365,7 @@ export const sfx = Object.fromEntries([
   ['caught', () => recordedOr('caught', synthesized.taskWrong)],
   ['stamp', () => recordedOr('task-stamp', synthesized.taskDone)],
   ['messenger', () => recordedOr('messenger', () => tone({ freq: 1900, to: 700, decay: 0.07, gain: 0.3 }))],
-  ['bossReturn', () => recordedOr('boss-return', () => burst({ freq: 300, decay: 0.2, gain: 0.4 }))],
+  ['bossReturn', () => recordedOr('boss-return', () => burst({ freq: 300, decay: 0.2, gain: 0.4, dest: boss }), boss)],
   ['hit', () => recordedOr('meeting-hit', () => { burst({ freq: 650, decay: 0.12, gain: 0.85 }); tone({ freq: 160, to: 55, decay: 0.14, gain: 0.7 }); })],
   ['award', () => recordedOr('award', () => [C5, E5, G5].forEach(n => bell(note(n), { decay: 1.2, gain: 0.1 })))],
 ].map(([name, play]) => [name, () => { if (ready()) play(); }]));

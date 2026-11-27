@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { clock, number, won } from '../../shared/format.js';
 import { KeyHint } from '../../shared/ui/shortcuts.jsx';
+import { Icon, faEnvelope, faFileSignature, faTable } from '../../shared/ui/icon.jsx';
 
 const kinds = {
-  sheet: { name: '매출 집계', icon: '▦' },
-  approval: { name: '전자결재', icon: '▤' },
-  mail: { name: '메일 분류', icon: '✉' },
+  sheet: { name: '매출 집계', icon: faTable },
+  approval: { name: '전자결재', icon: faFileSignature },
+  mail: { name: '메일 분류', icon: faEnvelope },
 };
 
 function Sheet({ data, answer, onAnswer, disabled, active }) {
@@ -161,7 +162,7 @@ export function Work({ game, visible, active, send, gauges, loanAction }) {
       <div className="min-w-0 space-y-4 p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-3">
-            {kind && <span aria-hidden="true" className="grid size-9 place-items-center rounded-lg bg-indigo-50 dark:bg-[var(--dark-selection)] text-lg text-indigo-800 dark:text-indigo-200">{kind.icon}</span>}
+            {kind && <span aria-hidden="true" className="grid size-9 place-items-center rounded-lg bg-indigo-50 dark:bg-[var(--dark-selection)] text-base text-indigo-800 dark:text-indigo-200"><Icon icon={kind.icon} /></span>}
             <div><p className="text-xs text-ui-secondary">업무 {task.number} · {kind?.name ?? '업무'}</p>
               <h3 className="mt-0.5 font-bold">{task.title ?? '매출 합계 입력'}</h3></div>
           </div>

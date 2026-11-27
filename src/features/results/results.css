@@ -113,6 +113,7 @@
   left: 0.9rem;
   font-size: 1.25rem;
   transform: rotate(-14deg);
+  color: #e0a516;
   filter: drop-shadow(0 2px 2px #0000002a);
 }
 
@@ -146,12 +147,14 @@
 }
 
 .result-trophy {
+  color: #c98a0b;
   background: radial-gradient(circle at 35% 30%, #fff7da, #ffd770 70%);
   box-shadow: 0 0 0 4px #ffe7a3, 0 8px 24px #e2a91d55;
   animation: trophy-pop 700ms cubic-bezier(0.3, 1.6, 0.5, 1) both, trophy-glow 2.4s ease-in-out 700ms infinite;
 }
 
 [data-theme="dark"] .result-trophy {
+  color: #ffd873;
   background: radial-gradient(circle at 35% 30%, #5a4a1c, #2f2711 75%);
   box-shadow: 0 0 0 4px #5b4a1a, 0 8px 24px #e2b33a40;
 }

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { sfx } from '../../shared/audio/spatial-audio.js';
+import { Icon, faBriefcase, faCrown, faFaceSadTear, faMedal, faTrophy, faUserTie } from '../../shared/ui/icon.jsx';
 import { clock, number, signed, won } from '../../shared/format.js';
 
 const playerLabel = (player, you) => player === you ? player + ' (나)' : player;
@@ -8,7 +9,9 @@ const percent = value => signed(value, v => v.toFixed(2) + '%');
 const movement = value => value > 0 ? 'text-rose-700 dark:text-[var(--dark-up)]'
   : value < 0 ? 'text-blue-700 dark:text-[var(--dark-down)]' : 'text-ui-secondary';
 const arrow = value => value > 0 ? '▲ ' : value < 0 ? '▼ ' : '';
-const medals = { 1: '🥇', 2: '🥈', 3: '🥉' };
+/** 1~3위 메달(금·은·동 색). */
+const medalColor = { 1: 'text-amber-500', 2: 'text-slate-400', 3: 'text-orange-700 dark:text-orange-400' };
+const Medal = ({ rank }) => medalColor[rank] ? <Icon icon={faMedal} className={medalColor[rank]} /> : null;
 
 /** 출근 자금 대비 손익. 서버가 출근 자금을 보내지 않으면(구버전) null. */
 function profitOf(row, startingCashWon) {
@@ -37,13 +40,13 @@ function PlayerResult({ row, you, selected, onSelect, scale, profit }) {
   const tone = profit ? (profit.won > 0 ? 'up' : profit.won < 0 ? 'down' : 'flat') : (positive ? 'up' : 'down');
   return <button type="button" data-rank={row.rank} className="result-player relative grid w-full gap-3 rounded-xl border border-ui-border bg-ui-subtle p-3.5 text-left hover:bg-ui-muted"
     aria-pressed={selected} aria-controls="settlement-details" onClick={() => onSelect(row.player)}>
-    {row.rank === 1 && <span className="result-crown" aria-hidden="true">👑</span>}
+    {row.rank === 1 && <span className="result-crown" aria-hidden="true"><Icon icon={faCrown} /></span>}
     <span className="flex min-w-0 items-start gap-3">
       <RankBadge rank={row.rank} />
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
           <span className="font-bold [overflow-wrap:anywhere]">{playerLabel(row.player, you)}</span>
-          {medals[row.rank] && <span aria-hidden="true">{medals[row.rank]}</span>}
+          <Medal rank={row.rank} />
           {row.bankrupt && <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs font-semibold text-blue-900 dark:bg-blue-950 dark:text-blue-200">파산</span>}
         </span>
         <span className="mt-0.5 block text-xs text-ui-secondary">최종 순자산</span>
@@ -153,9 +156,9 @@ function Confetti() {
 
 /** 오늘의 직원상. 서버의 award 이름별 제목·설명·값 표시. */
 const awardInfo = {
-  scolded: { icon: '🫡', title: '부장님 단골상', caption: '부장님과 가장 자주 면담했어요', value: v => number(v) + '번 훈계' },
-  biggestLoss: { icon: '😭', title: '눈물의 퇴근상', caption: '오늘 가장 많이 잃었어요', value: v => won(v) },
-  hardestWorker: { icon: '💼', title: '업무왕', caption: '주식보다 업무에 진심이었어요', value: v => number(v) + '건 처리' },
+  scolded: { icon: faUserTie, title: '부장님 단골상', caption: '부장님과 가장 자주 면담했어요', value: v => number(v) + '번 훈계' },
+  biggestLoss: { icon: faFaceSadTear, title: '눈물의 퇴근상', caption: '오늘 가장 많이 잃었어요', value: v => won(v) },
+  hardestWorker: { icon: faBriefcase, title: '업무왕', caption: '주식보다 업무에 진심이었어요', value: v => number(v) + '건 처리' },
 };
 
 function EmployeeAwards({ awards, you }) {
@@ -169,7 +172,7 @@ function EmployeeAwards({ awards, you }) {
         const mine = award.players.includes(you);
         return <li key={award.award} data-award={award.award} data-mine={mine}
           className="result-award flex min-w-0 items-start gap-3 rounded-xl border border-ui-border bg-ui-subtle p-3.5 data-[mine=true]:border-amber-400 data-[mine=true]:bg-amber-50 dark:data-[mine=true]:bg-amber-950/40">
-          <span className="result-award-icon grid size-11 shrink-0 place-items-center rounded-xl bg-ui-surface text-2xl" aria-hidden="true">{info.icon}</span>
+          <span className="result-award-icon grid size-11 shrink-0 place-items-center rounded-xl bg-ui-surface text-xl text-amber-600 dark:text-amber-300" aria-hidden="true"><Icon icon={info.icon} /></span>
           <span className="min-w-0">
             <span className="block font-bold">{info.title}{award.players.length > 1 && <span className="ml-1 text-xs font-semibold text-ui-secondary">공동</span>}</span>
             <span className="block text-xs text-ui-secondary">{info.caption}</span>
@@ -228,13 +231,13 @@ export function Results({ result, name, host, solo, connected, send, restartErro
       {celebrate && <Confetti />}
       <div className="relative flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-4">
-          {celebrate && <span className="result-trophy grid size-16 shrink-0 place-items-center rounded-2xl text-4xl sm:size-20 sm:text-5xl" aria-hidden="true">🏆</span>}
+          {celebrate && <span className="result-trophy grid size-16 shrink-0 place-items-center rounded-2xl text-4xl sm:size-20 sm:text-4xl" aria-hidden="true"><Icon icon={faTrophy} /></span>}
           <div className="min-w-0">
             <h2 id="results-title" className="results-title text-2xl font-extrabold tracking-tight sm:text-3xl">{title}</h2>
             {sub && <p className="mt-1 text-sm leading-relaxed break-keep text-ui-secondary">{sub}</p>}
             {!solo && winners.length > 0 && <p className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm text-ui-secondary">
               <span data-rank="1" className="result-rank shrink-0 rounded-full px-3 py-1 text-xs font-bold">
-                👑 {winners.length > 1 ? '공동 1위' : '1위'}
+                <Icon icon={faCrown} className="mr-1" />{winners.length > 1 ? '공동 1위' : '1위'}
               </span>
               <span className="min-w-0 font-semibold text-ui-text [overflow-wrap:anywhere]">{winners.map(row => playerLabel(row.player, you)).join(', ')}</span>
             </p>}
@@ -261,7 +264,7 @@ export function Results({ result, name, host, solo, connected, send, restartErro
         <div className="min-w-0 rounded-xl border border-ui-border bg-ui-surface px-3 py-2.5 sm:px-4">
           <dt className="text-sm text-ui-secondary">내 순위</dt>
           <dd className="mt-1 flex flex-wrap items-center gap-x-2 text-xl font-extrabold">
-            {mine.rank}위{!solo && medals[mine.rank] && <span aria-hidden="true">{medals[mine.rank]}</span>}
+            {mine.rank}위{!solo && <Medal rank={mine.rank} />}
             {mine.bankrupt && <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-900 dark:bg-blue-950 dark:text-blue-200">파산</span>}
           </dd>
         </div>
