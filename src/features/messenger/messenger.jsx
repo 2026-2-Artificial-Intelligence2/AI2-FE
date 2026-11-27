@@ -27,6 +27,10 @@ function Channel({ active, title, detail, marker, onSelect }) {
 
 export function Messenger({ game, send, playing, closing, onDismiss, docked = false, initialChannel = group }) {
   const { room, chats, connected, actionErrors, leakReceipt } = game;
+  // 익명 찌라시는 한 판에 여러 번(서버가 정한 횟수, 사이 간격). 다 쓰면 막는다.
+  const leakLimit = game.leak?.perRound ?? 1;
+  const leaksLeft = leakReceipt ? leakReceipt.remaining ?? 0 : leakLimit;
+  const leaksDone = leaksLeft <= 0;
   const lastError = actionErrors.CHAT;
   const me = room.youLabel;
   const members = (room.members ?? []).filter(member => member.label !== me);
@@ -103,7 +107,7 @@ export function Messenger({ game, send, playing, closing, onDismiss, docked = fa
 
   function submit(event) {
     event.preventDefault();
-    if (!connected || closing || pending || !canSubmit || (anonymous && leakReceipt)) return;
+    if (!connected || closing || pending || !canSubmit || (anonymous && leaksDone)) return;
     if (!send(anonymous ? 'LEAK_ARTICLE ' + JSON.stringify({ headline: text, body }) : 'CHAT ' + selected + ' ' + text)) return;
     setFeedback(null);
     setPending({ channel: selected, text, draft, after: chats.at(-1)?.id ?? 0, error: lastError, receipt: leakReceipt });
@@ -147,7 +151,7 @@ export function Messenger({ game, send, playing, closing, onDismiss, docked = fa
             detail={member.online ? '접속 중' : '오프라인'}
             marker={Array.from(member.label.normalize('NFC').trim())[0] ?? '?'}
             onSelect={() => setChannel(member.label)} />)}
-          {playing && <Channel active={anonymous} title="익명 찌라시" detail={leakReceipt ? '이번 판 전송 완료' : '한 판에 한 번'}
+          {playing && <Channel active={anonymous} title="익명 찌라시" detail={leaksDone ? '이번 판 모두 사용' : leakReceipt ? `${leaksLeft}번 남음` : `한 판에 ${leakLimit}번`}
             marker="!" onSelect={() => setChannel(rumor)} />}
         </nav>
       </aside>
@@ -158,7 +162,7 @@ export function Messenger({ game, send, playing, closing, onDismiss, docked = fa
             : direct ? '나와 상대방만 볼 수 있습니다.' : '같은 방에 있는 직원 모두가 볼 수 있습니다.'}</p>
         </header>
         {anonymous ? <div className="flex min-h-0 flex-1 items-center overflow-y-auto px-3 py-4 text-sm text-ui-secondary">
-          <p>{leakReceipt?.message ?? '제목과 본문을 작성하세요.'}</p>
+          <p>{leakReceipt?.message ?? `제목과 본문을 작성하세요. 한 판에 ${leakLimit}번까지 뿌릴 수 있어요${game.leak?.gapSeconds ? `(${game.leak.gapSeconds}초 간격)` : ''}.`}</p>
         </div> : <div ref={list} role="log" aria-label={heading + ' 메시지'}
           className={'flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3 ' + (docked ? 'bg-ui-subtle' : 'bg-blue-50/45 dark:bg-ui-desktop')}>
           {messages.length ? messages.map((message, index) => {
@@ -174,18 +178,18 @@ export function Messenger({ game, send, playing, closing, onDismiss, docked = fa
           {anonymous && <label className="block text-xs font-semibold text-ui-secondary">
             본문 <span className="font-normal">{bodyLength} / 300</span>
             <textarea aria-label="찌라시 본문" rows={3} className="field mt-1 w-full resize-y"
-              value={articleBody} disabled={!connected || closing || Boolean(pending || leakReceipt)}
+              value={articleBody} disabled={!connected || closing || Boolean(pending) || leaksDone}
               onChange={event => setArticleBody(event.target.value)} />
           </label>}
           <div className="flex gap-2">
             <input aria-label={anonymous ? '찌라시 제목' : '메시지'} className="field min-w-0 flex-1"
-              value={draft} autoFocus={!docked} disabled={!connected || closing || Boolean(anonymous && leakReceipt)}
+              value={draft} autoFocus={!docked} disabled={!connected || closing || Boolean(anonymous && leaksDone)}
               onChange={event => setDrafts({ ...drafts, [selected]: event.target.value })}
               onKeyDown={event => {
                 if (event.key === 'Enter' && event.nativeEvent.isComposing) event.preventDefault();
               }}
               placeholder={anonymous ? '찌라시 제목' : '메시지 입력'} />
-            <button type="submit" disabled={!connected || closing || !canSubmit || Boolean(pending || (anonymous && leakReceipt))}
+            <button type="submit" disabled={!connected || closing || !canSubmit || Boolean(pending) || (anonymous && leaksDone)}
               className="primary-action rounded-lg px-4 text-sm font-bold">{anonymous ? '소문 보내기' : '전송'}</button>
           </div>
           <div className="flex justify-between gap-3 text-xs text-ui-secondary">
