@@ -160,3 +160,9 @@
   .boss-nearby[data-near="close"] { animation: boss-nearby-pulse .9s ease-in-out infinite; }
 }
 @keyframes boss-nearby-pulse { 50% { box-shadow: 0 0 0 6px rgb(225 29 72 / .25); } }
+
+/* 부장님 혼잣말 말풍선: 살짝 떠오르며 나타난다(움직임 줄이기 설정이면 그냥 뜬다). */
+@media (prefers-reduced-motion: no-preference) {
+  .boss-line { animation: boss-line-in .35s ease-out both; }
+}
+@keyframes boss-line-in { from { opacity: 0; transform: translateY(6px); } }

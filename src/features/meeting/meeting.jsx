@@ -6,6 +6,7 @@ const dialogue = {
   idle: '아까부터 일이 하나도 안 올라오던데. 자리로 돌아가면 밀린 일부터 처리해.',
   market: '근무 시간에 주식 차트를 보고 있었어? 자리로 돌아가면 업무부터 해.',
   messenger: '근무 시간에 메신저로 수다야? 자리로 돌아가면 하던 일부터 마저 해.',
+  mood: '뭘 잘했다고 쳐다봐? 그냥… 요즘 다들 해이해서 그래. 자리로 돌아가서 똑바로 해.',
 };
 
 export function Meeting({ reason, startedAt, character }) {
