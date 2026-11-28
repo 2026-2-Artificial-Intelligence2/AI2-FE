@@ -6,7 +6,8 @@ import { VoicePanel } from './voice-panel.jsx';
 import { SettingsPanel } from './settings-panel.jsx';
 import { BossLine } from './boss-line.jsx';
 import { LunchClock, LunchNotice } from './lunch-notice.jsx';
-import { Icon, faClock } from '../shared/ui/icon.jsx';
+import { Icon, faCircleQuestion, faClock } from '../shared/ui/icon.jsx';
+import { GuideDialog } from '../features/guide/guide-dialog.jsx';
 import { BossNearby } from './boss-nearby.jsx';
 import { GameGauges } from './game-gauges.jsx';
 import { enableSound, sfx } from '../shared/audio/spatial-audio.js';
@@ -31,6 +32,7 @@ export function App() {
   const { theme, toggleTheme } = useTheme();
   const [inbox, setInbox] = useState(false);
   const [activeDialog, setActiveDialog] = useState(null);
+  const [guideOpen, setGuideOpen] = useState(false);
   const [conversation, setConversation] = useState('ALL');
   const [lobbyMessenger, setLobbyMessenger] = useState(false);
   const [underMessenger, setUnderMessenger] = useState('WORK');
@@ -207,6 +209,10 @@ export function App() {
   const messenger = room && messengerOpen && <Messenger key={'messenger-' + room.code + '-' + room.round} game={game}
     send={send} initialChannel={conversation} docked={inLobby} playing={!outsideRound} closing={Boolean(returning)} onDismiss={closeMessenger} />;
 
+  // 처음 하는 사람을 위한 도움말(실제 화면에 표시를 겹친 설명). 언제든 머리줄에서 연다.
+  const helpButton = <button type="button" className={headerControl + ' inline-flex items-center gap-1.5'} aria-haspopup="dialog"
+    onClick={() => setGuideOpen(true)}><Icon icon={faCircleQuestion} /><span className="hidden sm:inline">도움말</span><span className="sr-only sm:hidden">도움말</span></button>;
+
   return <>
     {officeActive && <OfficeViewport office={office} market={market} players={room.room.players}
       micLevels={connected ? game.micLevels : undefined}
@@ -220,7 +226,8 @@ export function App() {
           <h1 className="text-lg font-extrabold tracking-tight">부장님 몰래</h1>
           {computer && desktopShown && !result && <BossLine boss={market?.boss} />}
           <div className="flex items-center gap-2 text-sm sm:ml-auto">
-            <SettingsPanel theme={theme} onToggleTheme={toggleTheme} />
+            {/* 방 안에서는 설정을 나가기 왼쪽에 둔다(자주 누르지 않으니 끝으로). */}
+            {(!room || startingSolo) && <>{helpButton}<SettingsPanel theme={theme} onToggleTheme={toggleTheme} /></>}
             {room && !solo && <VoicePanel voice={voice} connected={connected} serverError={actionErrors.VOICE?.message} />}
           </div>
           {room && !startingSolo && <div className="col-span-full flex min-w-0 items-center gap-1.5 text-sm sm:flex-wrap sm:gap-2">
@@ -246,7 +253,8 @@ export function App() {
                 {view === 'WORK' ? '주식으로' : '업무로'}<span className="hidden lg:inline"><KeyHint>Tab</KeyHint></span>
               </button>
             </>}
-            <button type="button" className={headerControl + ' ml-auto sm:ml-0'} aria-haspopup="dialog" disabled={!connected}
+            <span className="ml-auto flex gap-1.5 sm:ml-0 sm:gap-2">{helpButton}<SettingsPanel theme={theme} onToggleTheme={toggleTheme} /></span>
+            <button type="button" className={headerControl} aria-haspopup="dialog" disabled={!connected}
               onClick={() => setActiveDialog('leave')}>나가기</button>
           </div>}
         </header>
@@ -270,6 +278,7 @@ export function App() {
           messengerOpen={messengerOpen} openMessenger={openMessenger} lastChat={lastChat} lastNews={lastNews} dismissNews={dismissNews} />}
         {activeDialog === 'loan' && showLoan &&
           <LoanDialog game={game} send={send} onDismiss={() => setActiveDialog(null)} />}
+        {guideOpen && <GuideDialog onDismiss={() => setGuideOpen(false)} />}
         {activeDialog === 'leave' && room && view !== 'MEETING' &&
           <LeaveDialog game={game} host={host} send={send} onDismiss={() => setActiveDialog(null)} />}
       </div>
