@@ -40,7 +40,31 @@ function Book({ book, onPrice }) {
   </section>;
 }
 
-function Account({ game, name, active, send }) {
+/**
+ * 체결 한 건의 손익. 매도는 평균 매수가 대비 실현 손익(서버가 계산), 매수는 지금 시세로 팔면 얼마인지(거래 비용 뺌).
+ * 신용 매수의 빚은 따로 갚아야 하므로 여기서는 주식 값만 비교한다.
+ */
+function TradeProfit({ trade, buying, price, feeBps = 0 }) {
+  let profit = trade.profitWon, rate = trade.returnPercent, note = '실현';
+  if (buying) {
+    if (!price || !trade.amountWon) return <span className="text-ui-caption">–</span>;
+    const gross = price * trade.quantity;
+    profit = gross - Math.ceil(gross * feeBps / 10000) - trade.amountWon;
+    rate = profit / trade.amountWon * 100;
+    note = '지금 팔면';
+  }
+  if (profit == null) return <span className="text-ui-caption">–</span>;
+  return <span className="whitespace-nowrap tabular-nums">
+    <b className={movement(profit)}>{signed(profit, won)}</b>
+    {rate != null && <span className={'ml-1 ' + movement(profit)}>({percent(rate)})</span>}
+    <span className="ml-1.5 text-[11px] text-ui-caption">{note}</span>
+  </span>;
+}
+
+function Account({ game, name, active, send, onSelect, current }) {
+  // 줄 아무 데나 누르면 그 종목 화면(호가·주문)으로 바로 간다: 보유 종목을 빨리 팔 수 있게.
+  const stockLink = symbol => <span className="font-semibold">{name(symbol)}</span>;
+  let symbols = [];
   const [tab, setTab] = useState('보유 종목');
   const { portfolio } = game.market;
   const positions = Object.entries(portfolio.positions);
@@ -54,18 +78,27 @@ function Account({ game, name, active, send }) {
   let headings, rows;
   if (tab === tabNames[0]) {
     headings = ['종목', '보유 수량', '평균 매수가', '청산가', '손익', '신용 빚', '담보 비율'];
-    rows = positions.map(([symbol, p]) => [name(symbol), p.shares + '주', won(p.avgPriceWon), won(p.valueWon),
+    symbols = positions.map(([symbol]) => symbol);
+    rows = positions.map(([symbol, p]) => [stockLink(symbol), p.shares + '주', won(p.avgPriceWon), won(p.valueWon),
       <span className={movement(p.profitWon)}>{signed(p.profitWon, won)} ({percent(p.profitPercent)})</span>, p.debtWon ? won(p.debtWon) : '–', p.debtWon ? p.marginRatioPercent + '%' : '–']);
   } else if (tab === tabNames[1]) {
     headings = ['종목', '구분', '지정가', '수량', '주문 관리'];
-    rows = game.orders.map(order => [name(order.symbol), order.side, won(order.limitWon), order.quantity + '주',
+    symbols = game.orders.map(order => order.symbol);
+    rows = game.orders.map(order => [stockLink(order.symbol), order.side, won(order.limitWon), order.quantity + '주',
       <button className="control" disabled={!active || !game.connected} onClick={() => send('CANCEL ' + order.id)}>취소</button>]);
   } else {
-    headings = ['시각', '종목', '구분', '수량', '체결 금액', '주당 평균'];
-    rows = [...game.trades].reverse().map(trade => [
-      clock(trade.second), name(trade.symbol), trade.side, trade.quantity + '주', won(trade.amountWon),
-      won(Math.round(trade.amountWon / trade.quantity)),
-    ]);
+    headings = ['시각', '종목', '구분', '수량', '체결 금액', '주당 평균', '손익'];
+    symbols = [...game.trades].reverse().map(trade => trade.symbol);
+    rows = [...game.trades].reverse().map(trade => {
+      const buying = trade.side.endsWith('매수');
+      return [
+        clock(trade.second), stockLink(trade.symbol),
+        // 매수는 빨강, 매도는 파랑(국내 증권사 관례).
+        <span className={'font-semibold ' + movement(buying ? 1 : -1)}>{trade.side}</span>,
+        trade.quantity + '주', won(trade.amountWon), won(Math.round(trade.amountWon / trade.quantity)),
+        <TradeProfit trade={trade} buying={buying} price={game.market.prices?.[trade.symbol]} feeBps={game.feeBps} />,
+      ];
+    });
   }
   return <section className="panel p-4">
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -80,12 +113,19 @@ function Account({ game, name, active, send }) {
     <div className="mt-3 overflow-x-auto">
       <table className="data-table">
         <thead><tr>{headings.map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead>
-        <tbody>{rows.length ? rows.map((row, index) => <tr key={index}>{row.map((cell, column) => <td key={column}>{cell}</td>)}</tr>)
+        <tbody>{rows.length ? rows.map((row, index) => <tr key={index} tabIndex={0} aria-current={symbols[index] === current || undefined}
+          title={name(symbols[index]) + ' 주문 화면으로'} className="account-row cursor-pointer"
+          // 줄 안의 버튼(주문 취소)은 그대로 버튼으로 쓴다.
+          onClick={event => { if (!event.target.closest('button')) onSelect(symbols[index]); }}
+          onKeyDown={event => { if ((event.key === 'Enter' || event.key === ' ') && event.target === event.currentTarget) { event.preventDefault(); onSelect(symbols[index]); } }}>
+          {row.map((cell, column) => <td key={column}>{cell}</td>)}</tr>)
           : <tr><td colSpan={headings.length} className="text-ui-caption">내역이 없습니다.</td></tr>}</tbody>
       </table>
     </div>
   </section>;
 }
+
+const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export function Market({ visible, active, game, name, send, gauges, loanAction, theme }) {
   const [selected, setSelected] = useState('');
@@ -131,6 +171,12 @@ export function Market({ visible, active, game, name, send, gauges, loanAction, 
     setLimit('');
     setMode('MARKET');
   }
+  /** 계좌 표에서 고르면 그 종목의 주문 칸이 보이게 올라간다(창 크기에 따라 창 안이나 페이지가 스크롤된다). */
+  function open(id) {
+    select(id);
+    requestAnimationFrame(() => frame.current?.querySelector('.market-order')
+      ?.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'nearest' }));
+  }
 
   return <section id="market" ref={frame} className="market-window relative"
     style={size ? { width: size.width, height: size.height, maxHeight: '86dvh' } : undefined}>
@@ -159,7 +205,7 @@ export function Market({ visible, active, game, name, send, gauges, loanAction, 
             <Order key={symbol} game={game} symbol={symbol} mode={mode} setMode={setMode} limit={limit} setLimit={setLimit}
               name={name} active={active} send={send} />
           </div>
-          <Account game={game} name={name} active={active} send={send} />
+          <Account game={game} name={name} active={active} send={send} onSelect={open} current={symbol} />
           <details className="panel p-4">
             <summary className="cursor-pointer font-bold">{name(symbol)} 관련 뉴스 <span className="text-sm text-ui-caption">{news.length}건</span></summary>
             {news.length > 0 ? <ul className="mt-2 divide-y divide-ui-border">

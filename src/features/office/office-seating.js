@@ -26,7 +26,7 @@ function aimJoint(joint, child, target) {
   joint.updateWorldMatrix(false, true);
 }
 
-function fitArm(upperArm, forearm, hand, target, forward, elbowHint) {
+export function fitArm(upperArm, forearm, hand, target, forward, elbowHint) {
   const shoulder = position(upperArm);
   const elbow = position(forearm);
   const wrist = position(hand);

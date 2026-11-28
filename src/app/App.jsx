@@ -4,8 +4,9 @@ import { useTheme } from './use-theme.js';
 import { useVoice } from './use-voice.js';
 import { VoicePanel } from './voice-panel.jsx';
 import { SettingsPanel } from './settings-panel.jsx';
-import { BossNearby } from './boss-nearby.jsx';
 import { BossLine } from './boss-line.jsx';
+import { LunchClock, LunchNotice } from './lunch-notice.jsx';
+import { BossNearby } from './boss-nearby.jsx';
 import { GameGauges } from './game-gauges.jsx';
 import { enableSound, sfx } from '../shared/audio/spatial-audio.js';
 import { duckMusic, setMusic } from '../shared/audio/music.js';
@@ -216,6 +217,7 @@ export function App() {
       <div className="mx-auto max-w-[1520px] space-y-4 px-4 py-5 sm:px-7">
         <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 border-b border-ui-border pb-4 sm:flex sm:flex-wrap">
           <h1 className="text-lg font-extrabold tracking-tight">부장님 몰래</h1>
+          {computer && desktopShown && !result && <BossLine boss={market?.boss} />}
           <div className="flex items-center gap-2 text-sm sm:ml-auto">
             <SettingsPanel theme={theme} onToggleTheme={toggleTheme} />
             {room && !solo && <VoicePanel voice={voice} connected={connected} serverError={actionErrors.VOICE?.message} />}
@@ -230,6 +232,7 @@ export function App() {
               </b>
               {closingSoon && <span className="sr-only text-rose-700 sm:not-sr-only sm:ml-1 dark:text-rose-300">장 마감 임박</span>}
             </span>}
+            {market && !result && <LunchClock market={market} />}
             {canOpenMessengerPopup && <button className={headerControl} disabled={!connected} aria-haspopup="dialog"
               aria-keyshortcuts="M" onClick={openMessenger}>메신저<span className="hidden sm:inline"><KeyHint>M</KeyHint></span></button>}
             {computer && <>
@@ -258,7 +261,7 @@ export function App() {
         {result && <Results result={result} name={name} host={host} solo={solo} connected={connected} send={send} restartError={actionErrors.RESTART?.message} />}
         {!inLobby && messenger}
         {computer && desktopShown && <BossNearby market={market} />}
-        {computer && desktopShown && <BossLine market={market} />}
+        {computer && desktopShown && !result && <LunchNotice market={market} />}
         {computer && desktopShown && <Notifications game={game} inbox={inbox} toggleInbox={toggleInbox}
           messengerOpen={messengerOpen} openMessenger={openMessenger} lastChat={lastChat} lastNews={lastNews} dismissNews={dismissNews} />}
         {activeDialog === 'loan' && showLoan &&

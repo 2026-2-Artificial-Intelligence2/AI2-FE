@@ -161,8 +161,26 @@
 }
 @keyframes boss-nearby-pulse { 50% { box-shadow: 0 0 0 6px rgb(225 29 72 / .25); } }
 
+/* 말풍선 꼬리: 왼쪽 부장님 얼굴을 가리킨다(테두리 한 겹 + 바탕 한 겹). */
+.boss-line-bubble { --bubble-bg: #fef9c3; --bubble-border: #facc15; background: var(--bubble-bg); border-color: var(--bubble-border); color: #1c1917; }
+[data-theme="dark"] .boss-line-bubble { --bubble-bg: #3f3a1d; --bubble-border: #a16207; color: #fefce8; }
+.boss-line-bubble::before, .boss-line-bubble::after { content: ''; position: absolute; top: 50%; width: 0; height: 0; border-style: solid; transform: translateY(-50%); }
+.boss-line-bubble::before { left: -8px; border-width: 7px 8px 7px 0; border-color: transparent var(--bubble-border) transparent transparent; }
+.boss-line-bubble::after { left: -6.5px; border-width: 6px 7px 6px 0; border-color: transparent var(--bubble-bg) transparent transparent; }
 /* 부장님 혼잣말 말풍선: 살짝 떠오르며 나타난다(움직임 줄이기 설정이면 그냥 뜬다). */
 @media (prefers-reduced-motion: no-preference) {
   .boss-line { animation: boss-line-in .35s ease-out both; }
 }
 @keyframes boss-line-in { from { opacity: 0; transform: translateY(6px); } }
+
+/* 점심시간: 머리줄 남은 시간과 시작·끝 알림. 시작은 노랑(쉬는 시간), 끝은 빨강(부장님 복귀). */
+.lunch-chip { background: #fef3c7; color: #78350f; }
+[data-theme="dark"] .lunch-chip { background: #451a03; color: #fde68a; }
+.lunch-notice { background: #fffbeb; border-color: #fcd34d; color: #451a03; }
+.lunch-notice[data-lunch="false"] { background: #fff1f2; border-color: #fda4af; color: #4c0519; }
+[data-theme="dark"] .lunch-notice { background: #3b2a0a; border-color: #a16207; color: #fef3c7; }
+[data-theme="dark"] .lunch-notice[data-lunch="false"] { background: #3f0d18; border-color: #be123c; color: #ffe4e6; }
+@media (prefers-reduced-motion: no-preference) {
+  .lunch-notice { animation: lunch-notice-in .4s ease-out both; }
+}
+@keyframes lunch-notice-in { from { opacity: 0; transform: translateY(-8px); } }
