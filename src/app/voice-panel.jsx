@@ -71,8 +71,7 @@ export function VoicePanel({ voice, connected, serverError }) {
       className="absolute right-0 z-40 mt-2 w-72 space-y-3 rounded-xl border border-ui-border bg-ui-surface p-4 text-sm shadow-lg">
       {error && <p role="alert" className="text-xs text-rose-700 dark:text-rose-300">{error}</p>}
       {!voice.joined ? <>
-        <p className="leading-relaxed text-ui-secondary">같은 방 사람들과 목소리로 이야기해요. 목소리는 서버를 거치지 않고
-          참여한 사람끼리만 오가요.</p>
+        <p className="leading-relaxed text-ui-secondary">같은 방 사람들과 목소리로 이야기해요.</p>
         <p className={'rounded-lg px-3 py-2 text-xs leading-relaxed break-keep ' + (onCellular()
           ? 'bg-amber-50 font-semibold text-amber-950 dark:bg-amber-950 dark:text-amber-100' : 'bg-ui-subtle text-ui-secondary')}>
           {onCellular() ? '지금 휴대폰 데이터로 접속한 것 같아요. ' : ''}

@@ -265,7 +265,7 @@ export function App() {
         {(!room || startingSolo) && <Entry onGuide={() => setGuideOpen(true)} connected={connected && !startingSolo} send={send} status={game.status}
           account={game.account} accountNotice={game.accountNotice} actionErrors={actionErrors} startingSolo={startingSolo}
           leaderboard={game.leaderboard} leaderboardMonth={game.leaderboardMonth} />}
-        {inLobby && <Lobby onGuide={() => setGuideOpen(true)} key={'lobby-' + room.code + '-' + room.round} game={game} host={host} send={send}
+        {inLobby && <Lobby key={'lobby-' + room.code + '-' + room.round} game={game} host={host} send={send}
           messenger={messenger} />}
         {desk && !result && <Work game={game} visible={desktopView === 'WORK'} active={desktopInteractive && view === 'WORK' && !messengerOpen} gauges={gauges} loanAction={loanAction} send={send} />}
         {market && !result && <Market visible={desktopView === 'MARKET'} active={desktopInteractive && !messengerOpen && view === 'MARKET'} game={game} name={name} gauges={gauges} loanAction={loanAction} theme={theme} send={send} />}

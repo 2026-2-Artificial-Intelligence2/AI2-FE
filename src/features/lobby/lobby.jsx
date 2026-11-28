@@ -326,7 +326,7 @@ function RoomSettings({ sessionSeconds, host, connected, lengthError, startError
   );
 }
 
-export function Lobby({ game, host, send, messenger, onGuide }) {
+export function Lobby({ game, host, send, messenger }) {
   const { room, connected, status, actionErrors } = game;
   return (
     <section id='lobby' className={room.solo ? 'mx-auto max-w-2xl' : 'lobby-shell min-w-0'} aria-labelledby='lobby-title'>
@@ -339,7 +339,6 @@ export function Lobby({ game, host, send, messenger, onGuide }) {
             <p id='status' role='status' className='mt-1 text-sm text-ui-secondary'>
               {status || actionErrors.GENERAL?.message || (room.round > 1 ? room.round + '번째 판 · 시작 대기 중' : '시작 대기 중')}
             </p>
-            {onGuide && <GuideLink onClick={onGuide}>기다리는 동안 게임 방법 보기</GuideLink>}
           </div>
           {!room.solo && <InviteCode code={room.code} />}
         </header>
