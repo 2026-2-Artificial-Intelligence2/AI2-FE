@@ -59,7 +59,8 @@ export function makePhone(root) {
 const HOLD = new THREE.Vector3(-0.13, 1.13, 0.3);       // 가슴 앞, 오른쪽(부장님 기준 x가 -면 오른쪽)
 const ELBOW = new THREE.Vector3(-0.26, 0.98, 0.02);
 const EYES = new THREE.Vector3(0, 1.45, 0.15);
-const up = new THREE.Vector3(0, 0, 1);
+/** 주먹 한가운데에서 휴대폰 가운데까지(눈 쪽, 안쪽, 위로). */
+export const PHONE_INSET = {toward: 0.05, side: 0.015, up: 0.025};
 
 /**
  * 걷는 동작 위에 휴대폰 보는 팔과 고개를 얹는다. amount 0이면 그대로 걷고 1이면 화면을 들여다본다.
@@ -93,11 +94,16 @@ export function holdPhone(boss, phone, amount) {
   [...joints, head].forEach((joint, i) => remember(joint, bases[i]));
   boss.root.updateMatrixWorld(true);
 
-  // 주먹(손이 커서 가린다) 위로 휴대폰이 솟게 쥐고, 화면이 눈을 향하게 한다. grip은 방망이를 쥐는 자리다.
+  // 주먹 안쪽(눈 쪽)에 세워 쥔다: 아랫부분은 손가락이 감싸고, 화면은 똑바로 서서 눈을 향한다.
+  // grip은 방망이를 쥐는 자리(주먹 한가운데)다.
   const grip = boss.bone('grip.R') ?? joints[2];
-  const hand = boss.root.worldToLocal(grip.getWorldPosition(new THREE.Vector3()));
-  phone.position.copy(hand).add(new THREE.Vector3(0, 0.1, 0.02));
-  phone.quaternion.setFromUnitVectors(up, EYES.clone().sub(phone.position).normalize());
+  const fist = boss.root.worldToLocal(grip.getWorldPosition(new THREE.Vector3()));
+  const facing = EYES.clone().sub(fist).normalize();
+  phone.position.copy(fist).addScaledVector(facing, PHONE_INSET.toward).add(new THREE.Vector3(PHONE_INSET.side, PHONE_INSET.up, 0));
+  const screenOut = EYES.clone().sub(phone.position).normalize();
+  const sideways = new THREE.Vector3(0, 1, 0).cross(screenOut).normalize();
+  const upright = screenOut.clone().cross(sideways);
+  phone.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(sideways, upright, screenOut));
   phone.scale.setScalar(Math.min(1, amount * 1.5));
 }
 
@@ -113,7 +119,7 @@ export function makeSpeech(root) {
   let shown = null;
 
   function paint(text) {
-    const scale = 2, font = `600 ${15 * scale}px system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif`;
+    const scale = 2, font = `700 ${15 * scale}px system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif`;
     const context = canvas.getContext('2d');
     context.font = font;
     // 한 줄 최대 14자 남짓, 두 줄까지.
@@ -121,7 +127,7 @@ export function makeSpeech(root) {
     const lines = [];
     let current = '';
     for (const char of words) {
-      if (context.measureText(current + char).width > 230 * scale && current) { lines.push(current); current = ''; }
+      if (context.measureText(current + char).width > 200 * scale && current) { lines.push(current); current = ''; }
       current += char;
     }
     lines.push(current);
@@ -132,9 +138,10 @@ export function makeSpeech(root) {
     canvas.height = Math.ceil(lines.length * lineHeight + padY * 2 + tail);
     const w = canvas.width, h = canvas.height - tail, r = 12 * scale;
     context.font = font;
-    context.fillStyle = 'rgba(255,255,255,0.96)';
-    context.strokeStyle = '#d97706';
-    context.lineWidth = 2 * scale;
+    // 심플하게: 흰 말풍선, 옅은 회색 테두리, 진한 글자.
+    context.fillStyle = '#ffffff';
+    context.strokeStyle = 'rgba(15,23,42,0.18)';
+    context.lineWidth = 1.5 * scale;
     context.beginPath();
     context.roundRect(scale, scale, w - 2 * scale, h - 2 * scale, r);
     context.moveTo(w / 2 - tail, h - scale);
@@ -142,9 +149,9 @@ export function makeSpeech(root) {
     context.lineTo(w / 2 + tail, h - scale);
     context.fill();
     context.stroke();
-    context.fillStyle = 'rgba(255,255,255,0.96)';
+    context.fillStyle = '#ffffff';
     context.fillRect(w / 2 - tail + scale, h - 3 * scale, tail * 2 - 2 * scale, 3 * scale);
-    context.fillStyle = '#1f2937';
+    context.fillStyle = '#111827';
     context.textBaseline = 'middle';
     lines.forEach((line, i) => context.fillText(line, padX, padY + lineHeight * (i + 0.5)));
     // 캔버스 크기가 바뀌면 GPU 텍스처도 새로 만들어야 예전 글자가 남지 않는다.
@@ -153,8 +160,8 @@ export function makeSpeech(root) {
     texture.colorSpace = THREE.SRGBColorSpace;
     sprite.material.map = texture;
     sprite.material.needsUpdate = true;
-    // 월드 크기: 글 높이 약 0.1 m.
-    const metres = 0.1 / lineHeight;
+    // 월드 크기: 한 줄 높이 약 0.23 m(멀리 있어도 읽히게).
+    const metres = 0.23 / lineHeight;
     sprite.scale.set(canvas.width * metres, canvas.height * metres, 1);
   }
 

@@ -123,14 +123,21 @@ function TradeLog({ trades, you, name }) {
     </div>
     {rows.length ? <div className="mt-3 max-h-72 overflow-auto">
       <table className="data-table">
-        <thead><tr>{['근무 경과', '직원', '종목', '구분', '수량', '체결 금액'].map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead>
+        <thead><tr>{['근무 경과', '직원', '종목', '구분', '수량', '체결 금액'].map(label => <th scope="col" key={label}>{label}</th>)}
+          <th scope="col"><abbr title="매도: 평균 매수가 대비 실현 수익률 · 매수: 퇴근 때 시세로 팔았다면" className="no-underline">수익률</abbr></th></tr></thead>
         <tbody id="trades">{rows.map((trade, index) => <tr key={index}>
           <td>{clock(trade.second)}</td><td>{playerLabel(trade.player, you)}</td><td>{name(trade.symbol)}</td>
           <td className={'font-semibold ' + movement(trade.side.endsWith('매수') ? 1 : -1)}>{trade.side}</td>
           <td>{number(trade.quantity)}주</td><td>{won(trade.amountWon)}</td>
+          <td className={'whitespace-nowrap tabular-nums font-semibold ' + movement(trade.returnPercent ?? 0)}>
+            {trade.returnPercent == null ? '—' : signed(trade.returnPercent, v => v.toFixed(1) + '%')}
+            {trade.returnPercent != null && <span className="ml-1 text-[11px] font-normal text-ui-caption">{trade.side.endsWith('매수') ? '퇴근 기준' : '실현'}</span>}
+          </td>
         </tr>)}</tbody>
       </table>
-    </div> : <p className="mt-4 rounded-lg border border-dashed border-ui-border bg-ui-subtle px-4 py-5 text-center text-sm text-ui-secondary">{mineOnly ? '내 거래가 없었어요.' : '이번 판에는 거래가 없었어요.'}</p>}
+    </div> : null}
+    {rows.length > 0 && <p className="mt-2 text-xs text-ui-caption break-keep">수익률: 매도는 평균 매수가 대비 실현 수익률, 매수는 퇴근 때 시세로 팔았다면 얻었을 수익률이에요(거래 비용 포함).</p>}
+    {!rows.length && <p className="mt-4 rounded-lg border border-dashed border-ui-border bg-ui-subtle px-4 py-5 text-center text-sm text-ui-secondary">{mineOnly ? '내 거래가 없었어요.' : '이번 판에는 거래가 없었어요.'}</p>}
   </section>;
 }
 

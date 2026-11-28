@@ -40,7 +40,11 @@ function Book({ book, onPrice }) {
   </section>;
 }
 
-function Account({ game, name, active, send }) {
+function Account({ game, name, active, send, onSelect, current }) {
+  // 종목 이름을 누르면 그 종목 화면(호가·주문)으로 바로 간다: 보유 종목을 빨리 팔 수 있게.
+  const stockLink = symbol => <button type="button" aria-current={symbol === current || undefined}
+    className="font-semibold text-blue-700 underline-offset-2 hover:underline aria-[current]:text-ui-text aria-[current]:no-underline dark:text-blue-300"
+    title={name(symbol) + ' 주문 화면으로'} onClick={() => onSelect(symbol)}>{name(symbol)}</button>;
   const [tab, setTab] = useState('보유 종목');
   const { portfolio } = game.market;
   const positions = Object.entries(portfolio.positions);
@@ -54,16 +58,16 @@ function Account({ game, name, active, send }) {
   let headings, rows;
   if (tab === tabNames[0]) {
     headings = ['종목', '보유 수량', '평균 매수가', '청산가', '손익', '신용 빚', '담보 비율'];
-    rows = positions.map(([symbol, p]) => [name(symbol), p.shares + '주', won(p.avgPriceWon), won(p.valueWon),
+    rows = positions.map(([symbol, p]) => [stockLink(symbol), p.shares + '주', won(p.avgPriceWon), won(p.valueWon),
       <span className={movement(p.profitWon)}>{signed(p.profitWon, won)} ({percent(p.profitPercent)})</span>, p.debtWon ? won(p.debtWon) : '–', p.debtWon ? p.marginRatioPercent + '%' : '–']);
   } else if (tab === tabNames[1]) {
     headings = ['종목', '구분', '지정가', '수량', '주문 관리'];
-    rows = game.orders.map(order => [name(order.symbol), order.side, won(order.limitWon), order.quantity + '주',
+    rows = game.orders.map(order => [stockLink(order.symbol), order.side, won(order.limitWon), order.quantity + '주',
       <button className="control" disabled={!active || !game.connected} onClick={() => send('CANCEL ' + order.id)}>취소</button>]);
   } else {
     headings = ['시각', '종목', '구분', '수량', '체결 금액', '주당 평균'];
     rows = [...game.trades].reverse().map(trade => [
-      clock(trade.second), name(trade.symbol), trade.side, trade.quantity + '주', won(trade.amountWon),
+      clock(trade.second), stockLink(trade.symbol), trade.side, trade.quantity + '주', won(trade.amountWon),
       won(Math.round(trade.amountWon / trade.quantity)),
     ]);
   }
@@ -86,6 +90,8 @@ function Account({ game, name, active, send }) {
     </div>
   </section>;
 }
+
+const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export function Market({ visible, active, game, name, send, gauges, loanAction, theme }) {
   const [selected, setSelected] = useState('');
@@ -131,6 +137,12 @@ export function Market({ visible, active, game, name, send, gauges, loanAction, 
     setLimit('');
     setMode('MARKET');
   }
+  /** 계좌 표에서 고르면 그 종목의 주문 칸이 보이게 올라간다(창 크기에 따라 창 안이나 페이지가 스크롤된다). */
+  function open(id) {
+    select(id);
+    requestAnimationFrame(() => frame.current?.querySelector('.market-order')
+      ?.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'nearest' }));
+  }
 
   return <section id="market" ref={frame} className="market-window relative"
     style={size ? { width: size.width, height: size.height, maxHeight: '86dvh' } : undefined}>
@@ -159,7 +171,7 @@ export function Market({ visible, active, game, name, send, gauges, loanAction, 
             <Order key={symbol} game={game} symbol={symbol} mode={mode} setMode={setMode} limit={limit} setLimit={setLimit}
               name={name} active={active} send={send} />
           </div>
-          <Account game={game} name={name} active={active} send={send} />
+          <Account game={game} name={name} active={active} send={send} onSelect={open} current={symbol} />
           <details className="panel p-4">
             <summary className="cursor-pointer font-bold">{name(symbol)} 관련 뉴스 <span className="text-sm text-ui-caption">{news.length}건</span></summary>
             {news.length > 0 ? <ul className="mt-2 divide-y divide-ui-border">

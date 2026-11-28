@@ -4,6 +4,7 @@ import { useTheme } from './use-theme.js';
 import { useVoice } from './use-voice.js';
 import { VoicePanel } from './voice-panel.jsx';
 import { SettingsPanel } from './settings-panel.jsx';
+import { BossLine } from './boss-line.jsx';
 import { BossNearby } from './boss-nearby.jsx';
 import { GameGauges } from './game-gauges.jsx';
 import { enableSound, sfx } from '../shared/audio/spatial-audio.js';
@@ -215,6 +216,7 @@ export function App() {
       <div className="mx-auto max-w-[1520px] space-y-4 px-4 py-5 sm:px-7">
         <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 border-b border-ui-border pb-4 sm:flex sm:flex-wrap">
           <h1 className="text-lg font-extrabold tracking-tight">부장님 몰래</h1>
+          {computer && desktopShown && !result && <BossLine boss={market?.boss} />}
           <div className="flex items-center gap-2 text-sm sm:ml-auto">
             <SettingsPanel theme={theme} onToggleTheme={toggleTheme} />
             {room && !solo && <VoicePanel voice={voice} connected={connected} serverError={actionErrors.VOICE?.message} />}
@@ -258,7 +260,7 @@ export function App() {
         {!inLobby && messenger}
         {computer && desktopShown && <BossNearby market={market} />}
         {computer && desktopShown && <Notifications game={game} inbox={inbox} toggleInbox={toggleInbox}
-          messengerOpen={messengerOpen} openMessenger={openMessenger} lastChat={lastChat} lastNews={lastNews} dismissNews={dismissNews} boss={market?.boss} />}
+          messengerOpen={messengerOpen} openMessenger={openMessenger} lastChat={lastChat} lastNews={lastNews} dismissNews={dismissNews} />}
         {activeDialog === 'loan' && showLoan &&
           <LoanDialog game={game} send={send} onDismiss={() => setActiveDialog(null)} />}
         {activeDialog === 'leave' && room && view !== 'MEETING' &&
