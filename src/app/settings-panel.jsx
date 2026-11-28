@@ -76,7 +76,7 @@ export function SettingsPanel({ theme, onToggleTheme }) {
       <span aria-hidden="true" className="hidden sm:inline">설정</span>
     </button>
 
-    {open && <div role="dialog" aria-label="설정"
+    {open && <div role="dialog" aria-label="설정" data-settings-panel
       className="absolute right-0 z-40 mt-2 max-h-[calc(100dvh-6rem)] w-80 max-w-[calc(100vw-2rem)] space-y-4 overflow-y-auto rounded-xl border border-ui-border bg-ui-surface p-4 text-sm shadow-lg">
       <section className="space-y-2" aria-labelledby="settings-screen">
         <h2 id="settings-screen" className="text-xs font-bold text-ui-secondary">화면</h2>

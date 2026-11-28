@@ -204,3 +204,14 @@
 @media (max-width: 639px) {
   .resize-grip { display: none; }
 }
+
+@media (width < 40rem), (orientation: landscape) and (pointer: coarse) and (height < 32rem) {
+  [data-settings-panel] {
+    position: fixed;
+    inset-inline: 0;
+    top: 50%;
+    margin: 0 auto;
+    max-height: calc(100dvh - 2rem);
+    translate: 0 -50%;
+  }
+}
