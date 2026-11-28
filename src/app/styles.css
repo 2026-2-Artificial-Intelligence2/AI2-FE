@@ -172,3 +172,15 @@
   .boss-line { animation: boss-line-in .35s ease-out both; }
 }
 @keyframes boss-line-in { from { opacity: 0; transform: translateY(6px); } }
+
+/* 점심시간: 머리줄 남은 시간과 시작·끝 알림. 시작은 노랑(쉬는 시간), 끝은 빨강(부장님 복귀). */
+.lunch-chip { background: #fef3c7; color: #78350f; }
+[data-theme="dark"] .lunch-chip { background: #451a03; color: #fde68a; }
+.lunch-notice { background: #fffbeb; border-color: #fcd34d; color: #451a03; }
+.lunch-notice[data-lunch="false"] { background: #fff1f2; border-color: #fda4af; color: #4c0519; }
+[data-theme="dark"] .lunch-notice { background: #3b2a0a; border-color: #a16207; color: #fef3c7; }
+[data-theme="dark"] .lunch-notice[data-lunch="false"] { background: #3f0d18; border-color: #be123c; color: #ffe4e6; }
+@media (prefers-reduced-motion: no-preference) {
+  .lunch-notice { animation: lunch-notice-in .4s ease-out both; }
+}
+@keyframes lunch-notice-in { from { opacity: 0; transform: translateY(-8px); } }

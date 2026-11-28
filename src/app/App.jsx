@@ -5,6 +5,7 @@ import { useVoice } from './use-voice.js';
 import { VoicePanel } from './voice-panel.jsx';
 import { SettingsPanel } from './settings-panel.jsx';
 import { BossLine } from './boss-line.jsx';
+import { LunchClock, LunchNotice } from './lunch-notice.jsx';
 import { BossNearby } from './boss-nearby.jsx';
 import { GameGauges } from './game-gauges.jsx';
 import { enableSound, sfx } from '../shared/audio/spatial-audio.js';
@@ -231,6 +232,7 @@ export function App() {
               </b>
               {closingSoon && <span className="sr-only text-rose-700 sm:not-sr-only sm:ml-1 dark:text-rose-300">장 마감 임박</span>}
             </span>}
+            {market && !result && <LunchClock market={market} />}
             {canOpenMessengerPopup && <button className={headerControl} disabled={!connected} aria-haspopup="dialog"
               aria-keyshortcuts="M" onClick={openMessenger}>메신저<span className="hidden sm:inline"><KeyHint>M</KeyHint></span></button>}
             {computer && <>
@@ -259,6 +261,7 @@ export function App() {
         {result && <Results result={result} name={name} host={host} solo={solo} connected={connected} send={send} restartError={actionErrors.RESTART?.message} />}
         {!inLobby && messenger}
         {computer && desktopShown && <BossNearby market={market} />}
+        {computer && desktopShown && !result && <LunchNotice market={market} />}
         {computer && desktopShown && <Notifications game={game} inbox={inbox} toggleInbox={toggleInbox}
           messengerOpen={messengerOpen} openMessenger={openMessenger} lastChat={lastChat} lastNews={lastNews} dismissNews={dismissNews} />}
         {activeDialog === 'loan' && showLoan &&
