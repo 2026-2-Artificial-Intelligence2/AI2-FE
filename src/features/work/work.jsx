@@ -26,7 +26,7 @@ function Sheet({ data, answer, onAnswer, disabled, active }) {
         </tr>
         {data.rows.map((row, index) => <tr key={index} className="border-b border-ui-border">
           <td className="border-r border-ui-border bg-ui-subtle text-center text-xs text-ui-caption">{index + 2}</td>
-          <td className="px-4 py-2.5">{row.name}</td>
+          <td className="px-4 py-2.5 whitespace-nowrap">{row.name}</td>
           <td className="px-4 py-2.5 text-right font-medium">{number(row.amount)}</td>
         </tr>)}
         <tr className="bg-indigo-50/60 dark:bg-[var(--dark-selection)]">

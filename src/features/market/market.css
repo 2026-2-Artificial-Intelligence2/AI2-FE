@@ -23,6 +23,13 @@
   .market-order input[type="number"] { appearance: textfield; }
   .market-order input[type="number"]::-webkit-inner-spin-button,
   .market-order input[type="number"]::-webkit-outer-spin-button { appearance: none; margin: 0; }
+  /* 한 줄로 쌓이는 좁은 화면(휴대폰): 차트 바로 아래 주문 칸, 호가는 그 뒤. 주문하려고 호가를 지나 내려가지 않게. */
+  @container (max-width: 34.99rem) {
+    .market-chart { order: -2; }
+    .market-order { order: -1; }
+    /* 한 줄일 때는 칸 높이를 내용에 맞춘다(고정 높이 안에서 따로 스크롤되면 체결 안내가 잘린다). */
+    .market-panel { height: auto; }
+  }
   @container (min-width: 35rem) {
     .market-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .market-chart { grid-column: 1 / -1; }

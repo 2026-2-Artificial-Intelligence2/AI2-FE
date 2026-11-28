@@ -31,7 +31,7 @@ export function BossNearby({ market }) {
   const { rotation, where, near } = describeStep(market.step);
   if (near === 'far' || !where) return null;
   return <div role="status" aria-label={'부장님 발소리 ' + where + ' ' + nearLabel[near]} data-near={near}
-    className="boss-nearby pointer-events-none fixed bottom-6 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-bold shadow-lg">
+    className="boss-nearby pointer-events-none fixed bottom-6 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-bold whitespace-nowrap shadow-lg">
     <Icon icon={faShoePrints} className="text-sm" />
     <span aria-hidden="true" className="boss-nearby-arrow grid size-6 place-items-center rounded-full text-xs">
       <Icon icon={faArrowUp} style={{ transform: `rotate(${rotation}deg)` }} />

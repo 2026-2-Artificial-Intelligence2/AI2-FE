@@ -191,7 +191,7 @@ export function Market({ visible, active, game, name, send, gauges, loanAction, 
                 <p className="text-4xl font-extrabold tracking-tight tabular-nums">{won(price)}</p>
                 {change !== null && <p className={'text-sm font-semibold tabular-nums ' + movement(change)}>
                   {change > 0 ? '▲ ' : change < 0 ? '▼ ' : ''}{signed(change, won)} ({percent(rate)})
-                  <span className="ml-2 font-normal text-ui-caption">출근 시점 대비</span>
+                  <span className="ml-2 font-normal whitespace-nowrap text-ui-caption">출근 시점 대비</span>
                 </p>}
               </div>
             </div>
@@ -238,7 +238,8 @@ export function Market({ visible, active, game, name, send, gauges, loanAction, 
         </aside>
       </div>
     </div>
-    <div className="relative mt-1 h-6 shrink-0 rounded-md border border-ui-border bg-ui-surface">
+    {/* 창 크기 조절은 넓은 화면에서만(휴대폰은 화면 폭 그대로). */}
+    <div className="relative mt-1 hidden h-6 shrink-0 rounded-md border border-ui-border bg-ui-surface sm:block">
       <ResizeGrip frame={frame} label="주식 창 크기 조절" onResize={setSize} />
     </div>
   </section>;
