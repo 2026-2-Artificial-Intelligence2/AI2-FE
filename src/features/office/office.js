@@ -197,7 +197,10 @@ function draw(now) {
   }
   camera.position.set(position.x, 1.4 - (0.24 + DESK_DROP) * zoom, position.z + forwardZ * 0.45 * zoom);
   camera.rotation.set(pitch * (1 - zoom) - 0.27 * zoom, (forwardZ === 1 ? Math.PI : 0) + yaw * (1 - zoom), 0, 'YXZ');
-  const fov = 68 - zoom * 40;
+  // 세로 화면(휴대폰)에서는 같은 세로 시야로는 옆이 거의 안 보인다. 가로 시야가 약 50°가 되도록 세로 시야를 넓힌다(최대 90°).
+  const baseFov = camera.aspect >= 1 ? 68
+    : Math.min(90, Math.max(68, 2 * THREE.MathUtils.radToDeg(Math.atan(Math.tan(THREE.MathUtils.degToRad(25)) / camera.aspect))));
+  const fov = baseFov - zoom * (baseFov - 28);
   if (fov !== camera.fov) {
     camera.fov = fov;
     camera.updateProjectionMatrix();

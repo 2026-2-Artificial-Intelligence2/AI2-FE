@@ -213,6 +213,14 @@ export function App() {
   const helpButton = <button type="button" className={headerControl + ' inline-flex items-center gap-1.5'} aria-haspopup="dialog"
     onClick={() => setGuideOpen(true)}><Icon icon={faCircleQuestion} /><span className="hidden sm:inline">도움말</span><span className="sr-only sm:hidden">도움말</span></button>;
 
+  // 도움말·설정·나가기. 넓은 화면은 아래 줄 끝에, 휴대폰은 제목 줄에 둔다(한 번에 하나만 보인다).
+  const utilityButtons = <>
+    {helpButton}
+    <SettingsPanel theme={theme} onToggleTheme={toggleTheme} />
+    <button type="button" className={headerControl} aria-haspopup="dialog" disabled={!connected}
+      onClick={() => setActiveDialog('leave')}>나가기</button>
+  </>;
+
   return <>
     {officeActive && <OfficeViewport office={office} market={market} players={room.room.players}
       micLevels={connected ? game.micLevels : undefined}
@@ -221,7 +229,9 @@ export function App() {
       reason={game.meeting} startedAt={game.meetingStarted} character={game.meetingCharacter} />}
     <main inert={!desktopInteractive} data-monitor={desktopShown}
       className={(officeActive ? 'game-desktop ' : '') + 'min-h-screen'}>
-      <div className="mx-auto max-w-[1520px] space-y-4 px-4 py-5 sm:px-7">
+      <div className={'mx-auto max-w-[1520px] space-y-4 px-4 py-5 sm:px-7 ' +
+        // 휴대폰: 오른쪽 아래 알림·메신저 버튼과 뉴스 팝업이 맨 아래 입력칸을 가리지 않게 그만큼 더 내려 볼 수 있게 한다.
+        (computer && desktopShown && !result ? 'pb-44 sm:pb-5' : '')}>
         <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 border-b border-ui-border pb-4 sm:flex sm:flex-wrap">
           <h1 className="text-lg font-extrabold tracking-tight">부장님 몰래</h1>
           {computer && desktopShown && !result && <BossLine boss={market?.boss} />}
@@ -229,8 +239,10 @@ export function App() {
             {/* 방 안에서는 설정을 나가기 왼쪽에 둔다(자주 누르지 않으니 끝으로). */}
             {(!room || startingSolo) && <>{helpButton}<SettingsPanel theme={theme} onToggleTheme={toggleTheme} /></>}
             {room && !solo && <VoicePanel voice={voice} connected={connected} serverError={actionErrors.VOICE?.message} />}
+            {/* 휴대폰: 도움말·설정·나가기를 제목 줄에 둔다(아래 줄은 시간·화면 전환 버튼만, 넘치면 줄바꿈). */}
+            {room && !startingSolo && <span className="flex items-center gap-1.5 sm:hidden">{utilityButtons}</span>}
           </div>
-          {room && !startingSolo && <div className="col-span-full flex min-w-0 items-center gap-1.5 text-sm sm:flex-wrap sm:gap-2">
+          {room && !startingSolo && <div className="col-span-full flex min-w-0 flex-wrap items-center gap-1.5 text-sm sm:gap-2">
             {/* 퇴근까지 남은 시간: 점심시간 표시와 같은 알약 모양. 마지막 2분은 빨갛게 "장 마감 임박". */}
             {market && !result && <span id="clock" data-closing={closingSoon || undefined}
               className="clock-chip inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap tabular-nums sm:text-sm">
@@ -253,9 +265,7 @@ export function App() {
                 {view === 'WORK' ? '주식으로' : '업무로'}<span className="hidden lg:inline"><KeyHint>Tab</KeyHint></span>
               </button>
             </>}
-            <span className="ml-auto flex gap-1.5 sm:ml-0 sm:gap-2">{helpButton}<SettingsPanel theme={theme} onToggleTheme={toggleTheme} /></span>
-            <button type="button" className={headerControl} aria-haspopup="dialog" disabled={!connected}
-              onClick={() => setActiveDialog('leave')}>나가기</button>
+            <span className="hidden items-center gap-2 sm:flex">{utilityButtons}</span>
           </div>}
         </header>
         {room && !startingSolo && !inLobby && (game.status || actionErrors.VIEW || actionErrors.GENERAL || (!activeDialog && game.notice)) &&
