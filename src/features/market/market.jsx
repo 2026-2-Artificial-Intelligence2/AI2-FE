@@ -40,6 +40,27 @@ function Book({ book, onPrice }) {
   </section>;
 }
 
+/**
+ * 체결 한 건의 손익. 매도는 평균 매수가 대비 실현 손익(서버가 계산), 매수는 지금 시세로 팔면 얼마인지(거래 비용 뺌).
+ * 신용 매수의 빚은 따로 갚아야 하므로 여기서는 주식 값만 비교한다.
+ */
+function TradeProfit({ trade, buying, price, feeBps = 0 }) {
+  let profit = trade.profitWon, rate = trade.returnPercent, note = '실현';
+  if (buying) {
+    if (!price || !trade.amountWon) return <span className="text-ui-caption">–</span>;
+    const gross = price * trade.quantity;
+    profit = gross - Math.ceil(gross * feeBps / 10000) - trade.amountWon;
+    rate = profit / trade.amountWon * 100;
+    note = '지금 팔면';
+  }
+  if (profit == null) return <span className="text-ui-caption">–</span>;
+  return <span className="whitespace-nowrap tabular-nums">
+    <b className={movement(profit)}>{signed(profit, won)}</b>
+    {rate != null && <span className={'ml-1 ' + movement(profit)}>({percent(rate)})</span>}
+    <span className="ml-1.5 text-[11px] text-ui-caption">{note}</span>
+  </span>;
+}
+
 function Account({ game, name, active, send, onSelect, current }) {
   // 줄 아무 데나 누르면 그 종목 화면(호가·주문)으로 바로 간다: 보유 종목을 빨리 팔 수 있게.
   const stockLink = symbol => <span className="font-semibold">{name(symbol)}</span>;
@@ -66,12 +87,18 @@ function Account({ game, name, active, send, onSelect, current }) {
     rows = game.orders.map(order => [stockLink(order.symbol), order.side, won(order.limitWon), order.quantity + '주',
       <button className="control" disabled={!active || !game.connected} onClick={() => send('CANCEL ' + order.id)}>취소</button>]);
   } else {
-    headings = ['시각', '종목', '구분', '수량', '체결 금액', '주당 평균'];
+    headings = ['시각', '종목', '구분', '수량', '체결 금액', '주당 평균', '손익'];
     symbols = [...game.trades].reverse().map(trade => trade.symbol);
-    rows = [...game.trades].reverse().map(trade => [
-      clock(trade.second), stockLink(trade.symbol), trade.side, trade.quantity + '주', won(trade.amountWon),
-      won(Math.round(trade.amountWon / trade.quantity)),
-    ]);
+    rows = [...game.trades].reverse().map(trade => {
+      const buying = trade.side.endsWith('매수');
+      return [
+        clock(trade.second), stockLink(trade.symbol),
+        // 매수는 빨강, 매도는 파랑(국내 증권사 관례).
+        <span className={'font-semibold ' + movement(buying ? 1 : -1)}>{trade.side}</span>,
+        trade.quantity + '주', won(trade.amountWon), won(Math.round(trade.amountWon / trade.quantity)),
+        <TradeProfit trade={trade} buying={buying} price={game.market.prices?.[trade.symbol]} feeBps={game.feeBps} />,
+      ];
+    });
   }
   return <section className="panel p-4">
     <div className="flex flex-wrap items-center justify-between gap-3">
