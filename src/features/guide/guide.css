@@ -10,3 +10,9 @@
 .guide-toc:hover { background: var(--color-ui-muted); }
 .guide-toc[aria-current] { background: #fff7ed; color: #9a3412; font-weight: 700; }
 [data-theme="dark"] .guide-toc[aria-current] { background: #431407; color: #fed7aa; }
+
+/* 첫 화면·대기실의 "게임 방법 보기" 링크: 도움말 표시와 같은 주황. */
+.guide-link { background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; }
+.guide-link:hover { background: #ffedd5; }
+.guide-link > span { background: #f97316; color: #fff; }
+[data-theme="dark"] .guide-link { background: #431407; color: #fed7aa; border-color: #9a3412; }
