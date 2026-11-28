@@ -6,6 +6,7 @@ import { VoicePanel } from './voice-panel.jsx';
 import { SettingsPanel } from './settings-panel.jsx';
 import { BossLine } from './boss-line.jsx';
 import { LunchClock, LunchNotice } from './lunch-notice.jsx';
+import { Icon, faClock } from '../shared/ui/icon.jsx';
 import { BossNearby } from './boss-nearby.jsx';
 import { GameGauges } from './game-gauges.jsx';
 import { enableSound, sfx } from '../shared/audio/spatial-audio.js';
@@ -223,14 +224,17 @@ export function App() {
             {room && !solo && <VoicePanel voice={voice} connected={connected} serverError={actionErrors.VOICE?.message} />}
           </div>
           {room && !startingSolo && <div className="col-span-full flex min-w-0 items-center gap-1.5 text-sm sm:flex-wrap sm:gap-2">
-            {market && !result && <span id="clock" className="flex shrink-0 flex-col leading-tight tabular-nums sm:flex-row sm:items-center sm:gap-1">
-              <span className="text-xs text-ui-secondary sm:text-sm sm:text-ui-text">퇴근까지</span>
-              <b className={'grid shrink-0 whitespace-nowrap ' +
-                (closingSoon ? 'text-rose-700 dark:text-rose-300 sm:text-ui-text' : '')}>
-                <span aria-hidden="true" className="invisible col-start-1 row-start-1">00:00</span>
+            {/* 퇴근까지 남은 시간: 점심시간 표시와 같은 알약 모양. 마지막 2분은 빨갛게 "장 마감 임박". */}
+            {market && !result && <span id="clock" data-closing={closingSoon || undefined}
+              className="clock-chip inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap tabular-nums sm:text-sm">
+              <Icon icon={faClock} className="text-[0.85em]" />
+              <span>퇴근까지</span>
+              <b className="grid">
+                {/* 자리수가 같으면 폭이 그대로(숫자 고정폭)라, 초가 바뀌어도 옆 칸이 흔들리지 않는다. */}
+                <span aria-hidden="true" className="invisible col-start-1 row-start-1">{clock(market.remainingSeconds).replace(/\d/g, '0')}</span>
                 <span className="col-start-1 row-start-1">{clock(market.remainingSeconds)}</span>
               </b>
-              {closingSoon && <span className="sr-only text-rose-700 sm:not-sr-only sm:ml-1 dark:text-rose-300">장 마감 임박</span>}
+              {closingSoon && <span className="sr-only sm:not-sr-only">· 장 마감 임박</span>}
             </span>}
             {market && !result && <LunchClock market={market} />}
             {canOpenMessengerPopup && <button className={headerControl} disabled={!connected} aria-haspopup="dialog"

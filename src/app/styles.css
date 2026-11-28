@@ -175,6 +175,15 @@
 
 /* 점심시간: 머리줄 남은 시간과 시작·끝 알림. 시작은 노랑(쉬는 시간), 끝은 빨강(부장님 복귀). */
 .lunch-chip { background: #fef3c7; color: #78350f; }
+/* 퇴근까지 남은 시간: 평소엔 파랑 알약(근무 중), 장 마감 직전엔 빨강. 점심은 노랑. */
+.clock-chip { background: #dbeafe; color: #1e3a8a; }
+[data-theme="dark"] .clock-chip { background: #172554; color: #bfdbfe; }
+.clock-chip[data-closing] { background: #ffe4e6; color: #9f1239; }
+[data-theme="dark"] .clock-chip[data-closing] { background: #4c0519; color: #fecdd3; }
+@media (prefers-reduced-motion: no-preference) {
+  .clock-chip[data-closing] { animation: clock-chip-pulse 1.6s ease-in-out infinite; }
+}
+@keyframes clock-chip-pulse { 50% { box-shadow: 0 0 0 4px rgb(225 29 72 / .18); } }
 [data-theme="dark"] .lunch-chip { background: #451a03; color: #fde68a; }
 .lunch-notice { background: #fffbeb; border-color: #fcd34d; color: #451a03; }
 .lunch-notice[data-lunch="false"] { background: #fff1f2; border-color: #fda4af; color: #4c0519; }
