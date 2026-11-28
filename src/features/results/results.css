@@ -204,3 +204,7 @@
   .result-confetti { display: none; }
   .result-trophy { animation: none; }
 }
+
+/* 혼자 하기 퇴근 화면의 "상위 N% · 명예의 전당에 올리기" */
+.share-panel { background: #fffbeb; border-color: #fcd34d; color: #451a03; }
+[data-theme="dark"] .share-panel { background: #2a1f0a; border-color: #92400e; color: #fef3c7; }
