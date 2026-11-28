@@ -1,10 +1,15 @@
 import { bossMood, sfx } from '../shared/audio/spatial-audio.js';
 import { BOSS_DESK } from '../shared/scene/office-seats.js';
 
-/** 부장님이 자리에서 기분을 드러내는 소리와 그 간격(ms). 보통일 때는 아무 소리도 내지 않는다. */
+/**
+ * 부장님이 자리에서 기분을 드러내는 소리와 평균 간격(ms, ±20%). 보통일 때는 아무 소리도 내지 않는다.
+ * 너무 잦으면 정신없다는 플레이 의견으로 책상 치기는 11초 → 30초로 늘렸다.
+ */
 const MOOD_CUES = {
-  furious: ['slam', 11000], annoyed: ['sigh', 17000], pleased: ['hum', 22000], elated: ['hum', 13000],
+  furious: ['slam', 30000], annoyed: ['sigh', 32000], pleased: ['hum', 40000], elated: ['hum', 30000],
 };
+/** 자리에 앉은 뒤 이만큼(ms) 지나야 소리를 낸다(걸어 들어오는 중이나 막 앉았을 때는 내지 않는다). */
+const SETTLE_MS = 4000;
 
 /**
  * 서버 메시지를 보고 효과음을 낸다. 접속(재접속 포함) 뒤 처음 받는 업무·시세는 기준으로만 삼아,
@@ -17,7 +22,8 @@ export function createSoundCues() {
   let meeting = false;
   let started;       // 판이 시작됐는가(대기실을 본 뒤에만 출근 소리)
   let playing = false;   // 이번 접속에서 시세를 받았는가(퇴근 소리는 실제로 판을 하다 끝났을 때만)
-  let lastMoodCue = 0;   // 마지막 부장님 기분 소리(performance.now)
+  let nextMoodCue = 0;   // 다음 부장님 기분 소리를 낼 수 있는 때(performance.now)
+  let seatedSince = null;   // 부장님이 자리에 앉아 멈춘 때
 
   return {
     reset() {
@@ -65,11 +71,14 @@ export function createSoundCues() {
           lunch = nowLunch;
           meeting = false;
           playing = true;
-          // 자리에 앉은 부장님이 가끔 기분을 소리로 드러낸다(뒤쪽 자리에서 들리는 쪽).
+          // 자리에 앉은 부장님이 가끔 기분을 소리로 드러낸다. 걷는 중(자리로 걸어 들어오는 2초 포함)에는 내지 않는다.
           const cue = MOOD_CUES[message.boss?.mood];
           const now = performance.now();
-          if (cue && message.boss.atDesk && message.step && now - lastMoodCue > cue[1] * (0.8 + Math.random() * 0.4)) {
-            lastMoodCue = now;
+          const seated = Boolean(message.boss?.atDesk) && !message.walking;
+          seatedSince = seated ? seatedSince ?? now : null;
+          if (cue && seated && message.step && now - seatedSince >= SETTLE_MS && now >= nextMoodCue) {
+            // 간격은 소리를 낼 때 한 번만 뽑는다(매초 다시 뽑으면 늘 짧은 쪽으로 쏠린다).
+            nextMoodCue = now + cue[1] * (0.8 + Math.random() * 0.4);
             bossMood(cue[0], { to: BOSS_DESK, listener: message.step.listener });
           }
           if (popup) (popup.kind === 'rumor' ? sfx.rumor : sfx.news)();

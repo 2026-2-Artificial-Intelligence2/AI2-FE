@@ -21,13 +21,19 @@ export function SharePanel({ share, minutes, defaultName, connected, send, error
   }
 
   return <section aria-labelledby="share-title" className="share-panel relative mt-4 rounded-xl border p-4 sm:p-5">
-    <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-      <div>
-        <p className="text-sm font-semibold opacity-80">{month ? month + '월' : '이달'} {minutes}분 판 {share.runs.toLocaleString('ko-KR')}판 중</p>
-        {/* 판이 적으면 "상위 100%"(1판 중 1등)처럼 어색하니 등수로 보여 준다. */}
-        <h3 id="share-title" className="text-2xl font-extrabold tracking-tight sm:text-3xl">
-          {share.runs < 10 && share.rank ? `${share.rank}등` : `상위 ${share.topPercent}%`}
+    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+      {/* 한 문장으로 읽히게: "이번 달 15분 게임 중 1등". 판이 적으면 "상위 100%"(1판 중 1등)처럼 어색하니 등수로 보여 준다. */}
+      <div className="min-w-0">
+        <h3 id="share-title" className="text-lg font-bold break-keep sm:text-xl">
+          이번 달 {minutes}분 게임 중{' '}
+          <span className="text-3xl font-extrabold tracking-tight whitespace-nowrap sm:text-4xl">
+            {share.runs < 10 && share.rank ? `${share.rank}등` : `상위 ${share.topPercent}%`}
+          </span>
         </h3>
+        <p className="mt-1 text-xs opacity-75">
+          {month ? month + '월' : '이번 달'}에 끝난 {minutes}분 게임 {share.runs.toLocaleString('ko-KR')}판 기준
+          {share.runs >= 10 && share.rank ? ` · ${share.rank}등` : ''}
+        </p>
       </div>
       {shared
         ? <p role="status" className="text-sm font-semibold sm:text-right">
