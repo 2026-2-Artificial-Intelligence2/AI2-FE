@@ -672,7 +672,31 @@ export function furnish(scene, onPropsReady = () => {}) {
     });
     return fitChair;
   }
-  return { dressDesk, updateSky: updateLight, dispose() {
+  /**
+   * 부장님 자리: 사무실 서쪽 회의실 유리 앞에서 직원들 쪽(동쪽, +X)을 보고 앉는 책상. (x, z)는 의자 자리로,
+   * 서버의 Patrol.DESK와 같아야 한다. 부장님은 순찰 사이에 여기 앉아 매매한다.
+   */
+  function addBossDesk(x, z) {
+    const facing = Math.PI / 2;            // +X를 본다
+    const deskX = x + 0.65;                // 책상은 의자 앞(동쪽)
+    props.then(models => {
+      if (!models || disposed) return;
+      addProp(scene, models.desk, [1.84, DESK_TOP, 0.74], [deskX, 0, z], Math.PI / 2);
+      addProp(scene, models.chair, [0.68, 0.86, 0.64], [x, 0, z], facing);
+      const monitor = new THREE.Group();
+      monitor.position.set(deskX + 0.05, DESK_TOP, z);
+      monitor.rotation.y = facing + Math.PI;
+      monitor.scale.z = MONITOR_DEPTH_SCALE;
+      scene.add(monitor);
+      addProp(monitor, models.monitor, [0.65, 0.51, 0.22], [0, 0, 0]);
+      addProp(scene, models['keyboard-mouse'], [0.63, 0.026, 0.172], [x + 0.345, DESK_TOP, z], facing + Math.PI);
+      addProp(scene, models['desk-props'], [0.28, 0.19, 0.15], [deskX + 0.04, DESK_TOP, z + 0.63], facing + Math.PI);
+      contactShadow(scene, 0.26, 0.17, [deskX + 0.05, DESK_TOP, z], facing, 0.26);
+      decorate('takeaway-cup', scene, [0.091, 0.129, 0.091], [deskX - 0.11, DESK_TOP, z - 0.57], 0.3);
+    });
+  }
+
+  return { dressDesk, addBossDesk, updateSky: updateLight, dispose() {
     disposed = true;
     skyline.dispose();
     lamps.dispose();

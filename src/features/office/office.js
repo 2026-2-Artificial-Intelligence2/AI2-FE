@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {box} from '../../shared/scene/character.js';
 import {BOSS, glbActor} from '../../shared/scene/glb-actor.js';
-import {OFFICE_SEATS as seats, STAFF} from '../../shared/scene/office-seats.js';
+import {BOSS_DESK, OFFICE_SEATS as seats, STAFF} from '../../shared/scene/office-seats.js';
 import {DESK_DROP, OFFICE_CENTER_X, OFFICE_HALF_DEPTH, OFFICE_LENGTH, SUN_PATH, furnish} from './furnishings.js';
 import {fitDeskWorker} from './office-seating.js';
 import {turnListener} from '../../shared/audio/spatial-audio.js';
@@ -63,6 +63,7 @@ function init() {
   const unfinishFloor = finishFloor(box(scene,[OFFICE_LENGTH,0.1,OFFICE_HALF_DEPTH*2+0.2],[OFFICE_CENTER_X,-0.05,0],0xb8a58e));
   const furniture = furnish(scene, () => { monitorFrameDrawn = false; });
   const { dressDesk } = furniture;
+  furniture.addBossDesk(BOSS_DESK.x, BOSS_DESK.z);
   updateSky = furniture.updateSky;
   meetingWindow=addMeetingWindow(scene);
   // Inner faces of the walls; the west wall is solid only south of the meeting-room glass.
@@ -128,8 +129,13 @@ function poseWorker(person, name, time, dt) {
 // so the feet do not slide, and alternate a plain walk with a look-around walk.
 const BOSS_WALK_SPEED = 0.48;
 let bossBeat = 0, bossBeatStarted;
-function poseBoss(walking, step, beatStarted, dt) {
+function poseBoss(walking, step, beatStarted, dt, seated) {
   if (!boss.ready) return;
+  if (seated) {
+    boss.play('Sit (desk)', { fade: 0.35 });
+    boss.mixer.update(dt);
+    return;
+  }
   if (beatStarted !== bossBeatStarted) {
     bossBeatStarted = beatStarted;
     bossBeat += 1;
@@ -200,12 +206,19 @@ function draw(now) {
     poseWorker(person, STAFF[i], now/1000+i*1.23+(i<participants.length?0:2), dt);
   });
   const t=walking?Math.min(1,(now-beatStarted)/2000):1;
-  boss.root.position.set(THREE.MathUtils.lerp(step.from.x,step.to.x,t),0,THREE.MathUtils.lerp(step.from.z,step.to.z,t));
-  if (walking) boss.root.rotation.y=Math.atan2(step.to.x-step.from.x,step.to.z-step.from.z);
+  // 자리에 앉아 있으면(순찰 사이) 책상에서 직원들 쪽을 보고 앉는다. 서버가 atDesk를 보내지 않으면 예전처럼 선다.
+  const seated = Boolean(packet.boss?.atDesk) && !walking;
+  if (seated) {
+    boss.root.position.set(BOSS_DESK.x, 0, BOSS_DESK.z);
+    boss.root.rotation.y = BOSS_DESK.facing;
+  } else {
+    boss.root.position.set(THREE.MathUtils.lerp(step.from.x,step.to.x,t),0,THREE.MathUtils.lerp(step.from.z,step.to.z,t));
+    if (walking) boss.root.rotation.y=Math.atan2(step.to.x-step.from.x,step.to.z-step.from.z);
+  }
   // Until the server publishes actual boss presence, avoid showing a stationary boss during lunch.
   boss.root.visible=boss.ready && meeting === undefined &&
     (walking || !(packet.lunchStartsInSeconds<=0 && packet.lunchEndsInSeconds>0));
-  poseBoss(walking && t<1, step, beatStarted, dt);
+  poseBoss(walking && t<1, step, beatStarted, dt, seated);
   renderer.render(scene,camera);
 }
 

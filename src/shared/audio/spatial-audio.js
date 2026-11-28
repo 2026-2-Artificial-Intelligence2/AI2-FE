@@ -207,6 +207,30 @@ export function cough({ to, listener }) {
   for (const at of [0, 0.35]) burst({ at, type: 'bandpass', freq: 520, q: 1.4, attack: 0.02, decay: 0.18, gain: 0.55, dest: pan });
 }
 
+/**
+ * 부장님 기분 단서(자리에서 나는 소리): 'slam' 키보드·책상 내리치기(격노), 'sigh' 한숨(짜증), 'hum' 콧노래(기분 좋음).
+ * @param to 부장님 자리 @param listener 내 자리
+ */
+export function bossMood(kind, { to, listener }) {
+  if (!ready()) return;
+  const x = to.x - listener.position.x;
+  const z = to.z - listener.position.z;
+  const dest = spatial({ x, z, y: 0.2, at: 2 }, listener);
+  if (kind === 'slam') {
+    [0, 0.16, 0.34].forEach((at, i) => {
+      tone({ freq: 110, to: 38, at, decay: 0.18, gain: 0.7 - i * 0.12, dest });
+      burst({ at, freq: 500, decay: 0.09, gain: 0.55, dest });
+      burst({ at: at + 0.01, type: 'bandpass', freq: 2800, q: 2, decay: 0.03, gain: 0.25, dest });   // 키 소리
+    });
+  } else if (kind === 'sigh') {
+    burst({ type: 'bandpass', freq: 900, to: 280, q: 0.8, attack: 0.25, decay: 1.1, gain: 0.32, dest });
+    burst({ at: 0.05, type: 'lowpass', freq: 500, to: 200, attack: 0.3, decay: 1, gain: 0.18, dest });
+  } else if (kind === 'hum') {
+    [[note(60), 0], [note(64), 0.32], [note(67), 0.64], [note(64), 0.96], [note(62), 1.28]].forEach(([freq, at]) =>
+      tone({ type: 'triangle', freq, at, attack: 0.05, decay: 0.32, gain: 0.07, dest, filter: 1200 }));
+  }
+}
+
 export function turnListener(yaw) {
   if (!audio) return;
   const listener = audio.listener;

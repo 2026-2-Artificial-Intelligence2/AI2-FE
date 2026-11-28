@@ -123,7 +123,7 @@ function reduce(game, message, receivedAt) {
       };
     }
     case 'chart': return { ...game, candles: message.candles, candleSeconds: message.candleSeconds };
-    case 'catalog': return { ...game, stocks: message.stocks, feeBps: message.feeBps, margin: message.margin, loan: message.loan };
+    case 'catalog': return { ...game, stocks: message.stocks, feeBps: message.feeBps, margin: message.margin, loan: message.loan, leak: message.leak };
     case 'market': return {
       ...game, view: message.view, market: message, micLevels: message.micLevels ?? game.micLevels,
       candles: mergeCandles(game.candles, message.candles),
