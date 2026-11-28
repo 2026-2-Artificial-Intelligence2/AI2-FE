@@ -59,7 +59,10 @@ export function OfficeViewport({ office, market, players, micLevels, focused, lo
       onLostPointerCapture={() => { pointer.current = null; }}
     />
     {looking && <footer>
-      <span>드래그해서 둘러보기</span>
+      {/* 3D 장면 위라 어두운 알약 바탕을 깔아 읽히게 한다. 터치 화면에서는 "끌어서". */}
+      <span className="rounded-full bg-slate-950/60 px-3 py-1 text-white backdrop-blur-sm">
+        <span className="touch-hidden">드래그해서</span><span className="touch-only">끌어서</span> 둘러보기
+      </span>
       <button id="back" className="control text-ui-text" type="button" onClick={onReturn}>모니터 보기 <KeyHint>Q</KeyHint></button>
     </footer>}
   </section>;
