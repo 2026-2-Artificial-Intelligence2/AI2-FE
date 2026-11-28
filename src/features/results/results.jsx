@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { sfx } from '../../shared/audio/spatial-audio.js';
 import { Icon, faBriefcase, faCrown, faFaceSadTear, faMedal, faTrophy, faUserTie } from '../../shared/ui/icon.jsx';
 import { clock, number, signed, won } from '../../shared/format.js';
@@ -110,15 +110,30 @@ function SettlementDetails({ row, you, name, startingCashWon }) {
   </section>;
 }
 
-function TradeLog({ trades, you, name }) {
-  const [mineOnly, setMineOnly] = useState(false);
-  const rows = (mineOnly ? trades.filter(trade => trade.player === you) : trades).slice().reverse();
+/**
+ * 이번 판 거래 기록. 전체 또는 한 사람(나·다른 직원·부장님)씩 골라 본다.
+ * 위 순위 카드에서 사람을 고르면 그 사람 거래로 맞춰진다.
+ */
+function TradeLog({ trades, you, name, people, focus }) {
+  const [who, setWho] = useState('ALL');
+  const lastFocus = useRef(focus);
+  useEffect(() => {
+    if (focus === lastFocus.current) return;
+    lastFocus.current = focus;
+    if (focus) setWho(focus);
+  }, [focus]);
+  // 순위 순서대로, 거래가 있는 부장님은 맨 뒤에.
+  const choices = [...people, ...(trades.some(trade => !people.includes(trade.player)) ? [...new Set(trades.map(t => t.player))].filter(p => !people.includes(p)) : [])];
+  const rows = (who === 'ALL' ? trades : trades.filter(trade => trade.player === who)).slice().reverse();
+  const count = player => trades.filter(trade => trade.player === player).length;
   return <section className="panel min-w-0 p-5" aria-labelledby="trade-log-title">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <h3 id="trade-log-title" className="text-lg font-bold">거래 기록</h3>
-      <div className="segments" aria-label="거래 기록 범위">
-        <button aria-pressed={!mineOnly} onClick={() => setMineOnly(false)}>전체</button>
-        <button aria-pressed={mineOnly} onClick={() => setMineOnly(true)}>내 거래</button>
+      <div className="segments max-w-full flex-wrap" aria-label="누구의 거래를 볼까요">
+        <button aria-pressed={who === 'ALL'} onClick={() => setWho('ALL')}>전체 <span className="text-xs opacity-70">{trades.length}</span></button>
+        {choices.map(player => <button key={player} aria-pressed={who === player} onClick={() => setWho(player)}>
+          {player === you ? '나' : player} <span className="text-xs opacity-70">{count(player)}</span>
+        </button>)}
       </div>
     </div>
     {rows.length ? <div className="mt-3 max-h-72 overflow-auto">
@@ -137,7 +152,7 @@ function TradeLog({ trades, you, name }) {
       </table>
     </div> : null}
     {rows.length > 0 && <p className="mt-2 text-xs text-ui-caption break-keep">수익률: 매도는 평균 매수가 대비 실현 수익률, 매수는 퇴근 때 시세로 팔았다면 얻었을 수익률이에요(거래 비용 포함).</p>}
-    {!rows.length && <p className="mt-4 rounded-lg border border-dashed border-ui-border bg-ui-subtle px-4 py-5 text-center text-sm text-ui-secondary">{mineOnly ? '내 거래가 없었어요.' : '이번 판에는 거래가 없었어요.'}</p>}
+    {!rows.length && <p className="mt-4 rounded-lg border border-dashed border-ui-border bg-ui-subtle px-4 py-5 text-center text-sm text-ui-secondary">{who === 'ALL' ? '이번 판에는 거래가 없었어요.' : (who === you ? '내' : playerLabel(who, you) + '의') + ' 거래가 없었어요.'}</p>}
   </section>;
 }
 
@@ -302,7 +317,7 @@ export function Results({ result, name, host, solo, connected, send, restartErro
       {viewed && <SettlementDetails row={viewed} you={you} name={name} startingCashWon={startingCashWon} />}
     </div>
 
-    <TradeLog trades={trades} you={you} name={name} />
+    <TradeLog trades={trades} you={you} name={name} people={standings.map(row => row.player)} focus={selected} />
     {result.leaks?.length > 0 && <section className="panel p-5" aria-labelledby="rumor-reveal-title">
       <h3 id="rumor-reveal-title" className="text-lg font-bold">익명 찌라시 작성자</h3>
       <ul className="mt-3 divide-y divide-ui-border text-sm">{result.leaks.map(leak => <li key={leak.newsNumber} className="flex flex-wrap gap-x-3 gap-y-1 py-2">
