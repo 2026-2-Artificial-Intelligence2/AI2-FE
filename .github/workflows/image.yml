@@ -1,0 +1,37 @@
+# main에 올라오면 배포용 화면 이미지(Caddy + 빌드한 화면)를 만들어 ghcr.io에 올린다.
+# 서버는 이 이미지를 받아 실행만 한다(서버 메모리가 작아 서버에서 빌드하지 않는다). 손으로 돌리려면 Actions → Run workflow.
+name: 화면 이미지
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 이미지 이름(소문자)
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          # 지금 서버(Oracle E2.1.Micro)는 x86. ARM 서버(A1)로 옮기면 linux/arm64를 더하고 setup-qemu-action을 붙인다.
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
