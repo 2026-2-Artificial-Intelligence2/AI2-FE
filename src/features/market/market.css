@@ -47,3 +47,9 @@
   --ask-depth: color-mix(in srgb, var(--dark-down) 12%, var(--surface-bg));
   --bid-depth: color-mix(in srgb, var(--dark-up) 12%, var(--surface-bg));
 }
+
+/* 계좌 표의 줄을 누르면 그 종목으로 간다. 지금 보고 있는 종목 줄은 옅게 칠한다. */
+.account-row:hover td { background: var(--color-ui-muted); }
+.account-row:focus-visible { outline: 2px solid var(--color-blue-600, #2563eb); outline-offset: -2px; }
+.account-row[aria-current] td { background: var(--color-blue-50, #eff6ff); }
+[data-theme="dark"] .account-row[aria-current] td { background: var(--dark-selection); }

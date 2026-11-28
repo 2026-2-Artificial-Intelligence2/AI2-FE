@@ -41,10 +41,9 @@ function Book({ book, onPrice }) {
 }
 
 function Account({ game, name, active, send, onSelect, current }) {
-  // 종목 이름을 누르면 그 종목 화면(호가·주문)으로 바로 간다: 보유 종목을 빨리 팔 수 있게.
-  const stockLink = symbol => <button type="button" aria-current={symbol === current || undefined}
-    className="font-semibold text-blue-700 underline-offset-2 hover:underline aria-[current]:text-ui-text aria-[current]:no-underline dark:text-blue-300"
-    title={name(symbol) + ' 주문 화면으로'} onClick={() => onSelect(symbol)}>{name(symbol)}</button>;
+  // 줄 아무 데나 누르면 그 종목 화면(호가·주문)으로 바로 간다: 보유 종목을 빨리 팔 수 있게.
+  const stockLink = symbol => <span className="font-semibold">{name(symbol)}</span>;
+  let symbols = [];
   const [tab, setTab] = useState('보유 종목');
   const { portfolio } = game.market;
   const positions = Object.entries(portfolio.positions);
@@ -58,14 +57,17 @@ function Account({ game, name, active, send, onSelect, current }) {
   let headings, rows;
   if (tab === tabNames[0]) {
     headings = ['종목', '보유 수량', '평균 매수가', '청산가', '손익', '신용 빚', '담보 비율'];
+    symbols = positions.map(([symbol]) => symbol);
     rows = positions.map(([symbol, p]) => [stockLink(symbol), p.shares + '주', won(p.avgPriceWon), won(p.valueWon),
       <span className={movement(p.profitWon)}>{signed(p.profitWon, won)} ({percent(p.profitPercent)})</span>, p.debtWon ? won(p.debtWon) : '–', p.debtWon ? p.marginRatioPercent + '%' : '–']);
   } else if (tab === tabNames[1]) {
     headings = ['종목', '구분', '지정가', '수량', '주문 관리'];
+    symbols = game.orders.map(order => order.symbol);
     rows = game.orders.map(order => [stockLink(order.symbol), order.side, won(order.limitWon), order.quantity + '주',
       <button className="control" disabled={!active || !game.connected} onClick={() => send('CANCEL ' + order.id)}>취소</button>]);
   } else {
     headings = ['시각', '종목', '구분', '수량', '체결 금액', '주당 평균'];
+    symbols = [...game.trades].reverse().map(trade => trade.symbol);
     rows = [...game.trades].reverse().map(trade => [
       clock(trade.second), stockLink(trade.symbol), trade.side, trade.quantity + '주', won(trade.amountWon),
       won(Math.round(trade.amountWon / trade.quantity)),
@@ -84,7 +86,12 @@ function Account({ game, name, active, send, onSelect, current }) {
     <div className="mt-3 overflow-x-auto">
       <table className="data-table">
         <thead><tr>{headings.map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead>
-        <tbody>{rows.length ? rows.map((row, index) => <tr key={index}>{row.map((cell, column) => <td key={column}>{cell}</td>)}</tr>)
+        <tbody>{rows.length ? rows.map((row, index) => <tr key={index} tabIndex={0} aria-current={symbols[index] === current || undefined}
+          title={name(symbols[index]) + ' 주문 화면으로'} className="account-row cursor-pointer"
+          // 줄 안의 버튼(주문 취소)은 그대로 버튼으로 쓴다.
+          onClick={event => { if (!event.target.closest('button')) onSelect(symbols[index]); }}
+          onKeyDown={event => { if ((event.key === 'Enter' || event.key === ' ') && event.target === event.currentTarget) { event.preventDefault(); onSelect(symbols[index]); } }}>
+          {row.map((cell, column) => <td key={column}>{cell}</td>)}</tr>)
           : <tr><td colSpan={headings.length} className="text-ui-caption">내역이 없습니다.</td></tr>}</tbody>
       </table>
     </div>
