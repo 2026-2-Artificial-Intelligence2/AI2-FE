@@ -24,7 +24,7 @@ function GuideLink({ onClick, children }) {
   </button>;
 }
 
-export function Entry({ onGuide, connected, send, status, account, accountNotice, actionErrors, startingSolo, leaderboard, records, recoveryCode, gameNotice, dismissRecoveryCode }) {
+export function Entry({ onGuide, connected, send, status, account, accountNotice, actionErrors, startingSolo, leaderboard, leaderboardMonth }) {
   const [mode, setMode] = useState('TEAM');
   const [minutes, setMinutes] = useState(10);
   const requested = useRef(false);
@@ -54,8 +54,7 @@ export function Entry({ onGuide, connected, send, status, account, accountNotice
             {status && <p id='status' role='status' className='mt-2 text-xs text-ui-secondary'>{status}</p>}
           </div>
 
-          <AccountEntry account={account} notice={accountNotice} actionErrors={actionErrors} connected={connected} send={send}
-            records={records} recoveryCode={recoveryCode} gameNotice={gameNotice} dismissRecoveryCode={dismissRecoveryCode} />
+          <AccountEntry account={account} notice={accountNotice} actionErrors={actionErrors} connected={connected} send={send} />
 
           <section aria-labelledby='play-title' className={'space-y-3 transition-opacity ' + (ready ? '' : 'opacity-60')}>
             <div className='flex items-center justify-between gap-2'>
@@ -127,13 +126,13 @@ export function Entry({ onGuide, connected, send, status, account, accountNotice
                 {(() => {
                   const top = leaderboard?.find(board => board.minutes === minutes)?.entries[0];
                   return top && <p className='rounded-lg bg-ui-subtle px-3 py-2 text-xs text-ui-secondary'>
-                    {minutes}분 1위 <b className='text-ui-text'>{top.name}</b>{' '}
+                    이달 {minutes}분 1위 <b className='text-ui-text'>{top.name}<span className='font-normal text-ui-caption'>#{top.tag}</span></b>{' '}
                     <b className='tabular-nums text-rose-700 dark:text-rose-300'>{(top.bestReturnPercent > 0 ? '+' : '') + top.bestReturnPercent.toFixed(2)}%</b>
                     {' '}· 이 기록을 넘어 보세요!
                   </p>;
                 })()}
                 <p className='text-xs text-ui-secondary'>
-                  {account?.member ? '기록이 ' + minutes + '분 명예의 전당에 올라가요.' : '게스트 기록은 명예의 전당에 오르지 않아요.'}
+                  퇴근 화면에서 이달의 {minutes}분 명예의 전당에 올릴지 고를 수 있어요.
                 </p>
               </form>
             </div>
@@ -142,7 +141,7 @@ export function Entry({ onGuide, connected, send, status, account, accountNotice
       </section>
 
       <LeaderboardPanel durations={soloMinutes} minutes={minutes} onMinutes={setMinutes} boards={leaderboard}
-        me={account?.member ? account.name : null} connected={connected} error={actionErrors.LEADERBOARD?.message}
+        month={leaderboardMonth} me={account?.name} connected={connected} error={actionErrors.LEADERBOARD?.message}
         onRetry={() => send('LEADERBOARD')} />
     </div>
   );
@@ -226,9 +225,6 @@ function Players({ members, you }) {
                       {mine && ' (나)'}
                     </span>
                     {member.host && <span className='rounded bg-indigo-100 dark:bg-indigo-900 px-1.5 py-0.5 text-[11px] font-semibold text-indigo-900 dark:text-indigo-200'>방장</span>}
-                    <span className={'rounded px-1.5 py-0.5 text-[11px] font-semibold ' + (member.member
-                      ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200'
-                      : 'bg-ui-muted text-ui-secondary')}>{member.member ? '회원' : '게스트'}</span>
                   </div>
                   <p className={'mt-1 text-xs ' + (member.online ? 'text-ui-secondary' : 'font-medium text-amber-800 dark:text-amber-200')}>{member.online ? '접속 중' : '연결 끊김'}</p>
                 </div>

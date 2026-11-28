@@ -23,12 +23,12 @@ function Stat({ label, value, sub, className = '' }) {
   </div>;
 }
 
-function Records({ records, error }) {
+export function Records({ records, error }) {
   if (error) return <p role="alert" className="text-sm text-rose-700 dark:text-rose-300">{error}</p>;
   if (!records) return <p role="status" className="py-8 text-center text-sm text-ui-secondary">전적을 불러오는 중…</p>;
   const { summary, recent } = records;
   if (!summary.games) return <p className="rounded-lg border border-dashed border-ui-border bg-ui-subtle px-4 py-8 text-center text-sm text-ui-secondary">
-    아직 저장된 판이 없어요. 회원으로 한 판을 끝내면 여기에 쌓여요.
+    아직 끝낸 판이 없어요. 한 판을 끝내면 여기에 쌓여요.
   </p>;
   return <div className="space-y-4">
     <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -50,7 +50,8 @@ function Records({ records, error }) {
             <td className="whitespace-nowrap">{row.mode === 'solo' ? `혼자 ${row.minutes}분` : `함께 ${row.playerCount}명 · ${row.minutes}분`}</td>
             <td className="whitespace-nowrap">{row.mode === 'solo' ? '—' : row.rank ? `${row.rank}위` : '—'}{row.bankrupt && <span className="ml-1 text-xs text-blue-700 dark:text-blue-300">파산</span>}</td>
             <td className={'whitespace-nowrap tabular-nums font-semibold ' + tone(row.profitWon)}>{signed(row.profitWon, won)}</td>
-            <td className={'whitespace-nowrap tabular-nums ' + tone(row.returnPercent)}>{percent(row.returnPercent)}</td>
+            <td className={'whitespace-nowrap tabular-nums ' + tone(row.returnPercent)}>{percent(row.returnPercent)}
+              {row.shared && <span title="명예의 전당에 올린 판" className="ml-1 text-xs text-amber-700 dark:text-amber-300">🏆</span>}</td>
           </tr>)}</tbody>
         </table>
       </div>

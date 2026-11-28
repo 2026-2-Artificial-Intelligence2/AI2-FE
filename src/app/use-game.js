@@ -2,26 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { footsteps, cough } from '../shared/audio/spatial-audio.js';
 import { STAFF, staffAtSeat } from '../shared/scene/office-seats.js';
 import { createSoundCues } from './game-sounds.js';
+import { readNickname, saveNickname } from '../shared/local-profile.js';
 
 const seatKey = 'officeStockSeat';
-const loginKey = 'officeStockLogin';
-
-function readLoginToken() {
-  try {
-    return localStorage.getItem(loginKey);
-  } catch {
-    return null;
-  }
-}
-
-function saveLoginToken(token) {
-  try {
-    if (token) localStorage.setItem(loginKey, token);
-    else localStorage.removeItem(loginKey);
-  } catch {
-    // The open connection can still use the account if device storage is unavailable.
-  }
-}
 const initial = {
   stocks: [], candles: {}, orders: [], trades: [], history: [], chats: [],
   status: '연결 중…', actionErrors: {}, account: null, accountNotice: '',
@@ -43,6 +26,7 @@ function commandResponse(command) {
       DELETE: message => message.type === 'accountDeleted',
     }[target] ?? (() => false)];
     case 'GUEST': return [verb, message => message.type === 'guest'];
+    case 'SHARE': return [verb, message => message.type === 'shared'];
     case 'LOGOUT': return [verb, message => message.type === 'loggedOut'];
     case 'LEADERBOARD': return [verb, message => message.type === 'leaderboard'];
     case 'CREATE':
@@ -104,7 +88,11 @@ function reduce(game, message, receivedAt) {
     };
     case 'profileFailed': return { ...game, account: null, accountNotice: message.message };
     case 'loggedOut': return { ...game, account: null, accountNotice: '', records: null, recoveryCode: null };
-    case 'leaderboard': return { ...game, leaderboard: message.boards };
+    case 'leaderboard': return { ...game, leaderboard: message.boards, leaderboardMonth: message.month };
+    // 혼자 하기 퇴근 화면에서 명예의 전당에 올렸다.
+    case 'shared': return game.result?.share ? {
+      ...game, result: { ...game.result, share: { ...game.result.share, shared: { name: message.name, tag: message.tag, rank: message.rank } } },
+    } : game;
     case 'state': {
       const sameRoom = game.room?.code === message.code;
       const sameRound = sameRoom && game.room.round === message.round;
@@ -254,15 +242,16 @@ export function useGame() {
       connection.onopen = () => {
         sounds.reset();
         if (stopped) return;
-        const token = readLoginToken();
-        if (!token) {
+        // 로그인 없이: 이 기기에 기억한 닉네임으로 다시 들어온다.
+        const nickname = readNickname();
+        if (!nickname) {
           setGame(game => ({ ...game, account: null }));
           restoreSeat();
           return;
         }
         restoringAccount = true;
-        setGame(game => ({ ...game, connected: false, status: '로그인 확인 중…' }));
-        connection.send('AUTOLOGIN ' + token);
+        setGame(game => ({ ...game, connected: false, status: '이름 확인 중…' }));
+        connection.send('GUEST ' + nickname);
       };
       connection.onmessage = event => {
         if (stopped) return;
@@ -281,20 +270,18 @@ export function useGame() {
         }
 
         const receivedAt = performance.now();
-        if (restoringAccount &&
-            (message.type === 'profile' || message.type === 'profileFailed' || message.type === 'error')) {
+        if (restoringAccount && (message.type === 'guest' || message.type === 'error')) {
           restoringAccount = false;
-          if (message.type !== 'profile') {
-            saveLoginToken(null);
-            message = { ...message, type: 'profileFailed' };
+          if (message.type === 'error') {
+            saveNickname(null);
+            message = { type: 'profileFailed', message: '기억해 둔 닉네임을 쓸 수 없어요. 다시 정해 주세요.' };
           }
           const identity = message;
           setGame(game => reduce(game, identity, receivedAt));
           restoreSeat();
           return;
         }
-        if (message.type === 'profile' && message.token) saveLoginToken(message.token);
-        if (message.type === 'loggedOut' || message.type === 'guest' || message.type === 'accountDeleted') saveLoginToken(null);
+        if (message.type === 'guest') saveNickname(message.name);
 
         const pending = legacyCommands.current;
         while (pending.length && receivedAt - pending[0].sentAt >= 15000) pending.shift();

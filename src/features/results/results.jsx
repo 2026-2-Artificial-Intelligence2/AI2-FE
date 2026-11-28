@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { sfx } from '../../shared/audio/spatial-audio.js';
 import { Icon, faBriefcase, faCrown, faFaceSadTear, faMedal, faTrophy, faUserTie } from '../../shared/ui/icon.jsx';
 import { clock, number, signed, won } from '../../shared/format.js';
+import { saveRecord, updateRecord } from '../../shared/local-profile.js';
+import { SharePanel } from './share-panel.jsx';
 
 const playerLabel = (player, you) => player === you ? player + ' (나)' : player;
 const percent = value => signed(value, v => v.toFixed(2) + '%');
@@ -223,13 +225,26 @@ function headline({ mine, winners, solo, profit }) {
   return { title: '퇴근 · 최종 정산', sub: mine.rank + '위로 퇴근했어요. 다음 판엔 왕관을 노려 봐요!' };
 }
 
-export function Results({ result, name, host, solo, connected, send, restartError }) {
+export function Results({ result, name, host, solo, connected, send, restartError, shareError, recordId, minutes }) {
   const { standings, trades, you, startingCashWon } = result;
   const [selected, setSelected] = useState(you);
   const mine = standings.find(row => row.player === you);
   const viewed = standings.find(row => row.player === selected) ?? mine ?? standings[0];
   const winners = standings.filter(row => row.rank === 1);
   const myProfit = mine && profitOf(mine, startingCashWon);
+  // 내 기록(이 기기): 퇴근할 때 한 번 남기고(다시 받은 결과면 같은 줄을 고친다), 명예의 전당에 올리면 표시한다.
+  useEffect(() => {
+    if (!mine || !recordId) return;
+    saveRecord({
+      id: recordId, finishedAt: new Date().toISOString(), mode: solo ? 'solo' : 'multi', minutes,
+      playerCount: standings.length, rank: mine.rank, profitWon: mine.netWorthWon - startingCashWon,
+      returnPercent: startingCashWon ? (mine.netWorthWon - startingCashWon) / startingCashWon * 100 : 0,
+      bankrupt: mine.bankrupt, shared: Boolean(result.share?.shared),
+    });
+  }, [recordId]);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (recordId && result.share?.shared) updateRecord(recordId, { shared: true });
+  }, [recordId, result.share?.shared]);
   const { title, sub, celebrate } = headline({ mine, winners, solo, profit: myProfit });
   const showAwards = !solo && result.awards?.length > 0;
 
@@ -296,9 +311,7 @@ export function Results({ result, name, host, solo, connected, send, restartErro
           <dd className="mt-0.5 text-xs text-ui-secondary">업무 {number(mine.completedTasks)}건 완료</dd>
         </div>
       </dl>}
-      {result.recordNotice && <p data-recorded={result.recorded} className="relative mt-4 text-sm leading-relaxed text-ui-secondary data-[recorded=true]:font-semibold data-[recorded=true]:text-ui-text">
-        {result.recordNotice}
-      </p>}
+      {result.share && <SharePanel share={result.share} minutes={minutes} defaultName={you} connected={connected} send={send} error={shareError} />}
     </header>
 
     {showAwards && <EmployeeAwards awards={result.awards} you={you} />}
