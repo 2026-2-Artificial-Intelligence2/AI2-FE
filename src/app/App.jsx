@@ -6,6 +6,8 @@ import { VoicePanel } from './voice-panel.jsx';
 import { SettingsPanel } from './settings-panel.jsx';
 import { BossLine } from './boss-line.jsx';
 import { LunchClock, LunchNotice } from './lunch-notice.jsx';
+import { Icon, faCircleQuestion, faClock } from '../shared/ui/icon.jsx';
+import { GuideDialog } from '../features/guide/guide-dialog.jsx';
 import { BossNearby } from './boss-nearby.jsx';
 import { GameGauges } from './game-gauges.jsx';
 import { enableSound, sfx } from '../shared/audio/spatial-audio.js';
@@ -30,6 +32,7 @@ export function App() {
   const { theme, toggleTheme } = useTheme();
   const [inbox, setInbox] = useState(false);
   const [activeDialog, setActiveDialog] = useState(null);
+  const [guideOpen, setGuideOpen] = useState(false);
   const [conversation, setConversation] = useState('ALL');
   const [lobbyMessenger, setLobbyMessenger] = useState(false);
   const [underMessenger, setUnderMessenger] = useState('WORK');
@@ -206,6 +209,10 @@ export function App() {
   const messenger = room && messengerOpen && <Messenger key={'messenger-' + room.code + '-' + room.round} game={game}
     send={send} initialChannel={conversation} docked={inLobby} playing={!outsideRound} closing={Boolean(returning)} onDismiss={closeMessenger} />;
 
+  // 처음 하는 사람을 위한 도움말(실제 화면에 표시를 겹친 설명). 언제든 머리줄에서 연다.
+  const helpButton = <button type="button" className={headerControl + ' inline-flex items-center gap-1.5'} aria-haspopup="dialog"
+    onClick={() => setGuideOpen(true)}><Icon icon={faCircleQuestion} /><span className="hidden sm:inline">도움말</span><span className="sr-only sm:hidden">도움말</span></button>;
+
   return <>
     {officeActive && <OfficeViewport office={office} market={market} players={room.room.players}
       micLevels={connected ? game.micLevels : undefined}
@@ -219,18 +226,22 @@ export function App() {
           <h1 className="text-lg font-extrabold tracking-tight">부장님 몰래</h1>
           {computer && desktopShown && !result && <BossLine boss={market?.boss} />}
           <div className="flex items-center gap-2 text-sm sm:ml-auto">
-            <SettingsPanel theme={theme} onToggleTheme={toggleTheme} />
+            {/* 방 안에서는 설정을 나가기 왼쪽에 둔다(자주 누르지 않으니 끝으로). */}
+            {(!room || startingSolo) && <>{helpButton}<SettingsPanel theme={theme} onToggleTheme={toggleTheme} /></>}
             {room && !solo && <VoicePanel voice={voice} connected={connected} serverError={actionErrors.VOICE?.message} />}
           </div>
           {room && !startingSolo && <div className="col-span-full flex min-w-0 items-center gap-1.5 text-sm sm:flex-wrap sm:gap-2">
-            {market && !result && <span id="clock" className="flex shrink-0 flex-col leading-tight tabular-nums sm:flex-row sm:items-center sm:gap-1">
-              <span className="text-xs text-ui-secondary sm:text-sm sm:text-ui-text">퇴근까지</span>
-              <b className={'grid shrink-0 whitespace-nowrap ' +
-                (closingSoon ? 'text-rose-700 dark:text-rose-300 sm:text-ui-text' : '')}>
-                <span aria-hidden="true" className="invisible col-start-1 row-start-1">00:00</span>
+            {/* 퇴근까지 남은 시간: 점심시간 표시와 같은 알약 모양. 마지막 2분은 빨갛게 "장 마감 임박". */}
+            {market && !result && <span id="clock" data-closing={closingSoon || undefined}
+              className="clock-chip inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap tabular-nums sm:text-sm">
+              <Icon icon={faClock} className="text-[0.85em]" />
+              <span>퇴근까지</span>
+              <b className="grid">
+                {/* 자리수가 같으면 폭이 그대로(숫자 고정폭)라, 초가 바뀌어도 옆 칸이 흔들리지 않는다. */}
+                <span aria-hidden="true" className="invisible col-start-1 row-start-1">{clock(market.remainingSeconds).replace(/\d/g, '0')}</span>
                 <span className="col-start-1 row-start-1">{clock(market.remainingSeconds)}</span>
               </b>
-              {closingSoon && <span className="sr-only text-rose-700 sm:not-sr-only sm:ml-1 dark:text-rose-300">장 마감 임박</span>}
+              {closingSoon && <span className="sr-only sm:not-sr-only">· 장 마감 임박</span>}
             </span>}
             {market && !result && <LunchClock market={market} />}
             {canOpenMessengerPopup && <button className={headerControl} disabled={!connected} aria-haspopup="dialog"
@@ -242,7 +253,8 @@ export function App() {
                 {view === 'WORK' ? '주식으로' : '업무로'}<span className="hidden lg:inline"><KeyHint>Tab</KeyHint></span>
               </button>
             </>}
-            <button type="button" className={headerControl + ' ml-auto sm:ml-0'} aria-haspopup="dialog" disabled={!connected}
+            <span className="ml-auto flex gap-1.5 sm:ml-0 sm:gap-2">{helpButton}<SettingsPanel theme={theme} onToggleTheme={toggleTheme} /></span>
+            <button type="button" className={headerControl} aria-haspopup="dialog" disabled={!connected}
               onClick={() => setActiveDialog('leave')}>나가기</button>
           </div>}
         </header>
@@ -250,11 +262,11 @@ export function App() {
           <div role="status" className="panel px-4 py-3 text-sm text-ui-secondary">
             {game.status || actionErrors.VIEW?.message || actionErrors.GENERAL?.message || game.notice?.message}
           </div>}
-        {(!room || startingSolo) && <Entry connected={connected && !startingSolo} send={send} status={game.status}
+        {(!room || startingSolo) && <Entry onGuide={() => setGuideOpen(true)} connected={connected && !startingSolo} send={send} status={game.status}
           account={game.account} accountNotice={game.accountNotice} actionErrors={actionErrors} startingSolo={startingSolo}
           leaderboard={game.leaderboard} records={game.records} recoveryCode={game.recoveryCode} gameNotice={game.notice}
           dismissRecoveryCode={dismissRecoveryCode} />}
-        {inLobby && <Lobby key={'lobby-' + room.code + '-' + room.round} game={game} host={host} send={send}
+        {inLobby && <Lobby onGuide={() => setGuideOpen(true)} key={'lobby-' + room.code + '-' + room.round} game={game} host={host} send={send}
           messenger={messenger} />}
         {desk && !result && <Work game={game} visible={desktopView === 'WORK'} active={desktopInteractive && view === 'WORK' && !messengerOpen} gauges={gauges} loanAction={loanAction} send={send} />}
         {market && !result && <Market visible={desktopView === 'MARKET'} active={desktopInteractive && !messengerOpen && view === 'MARKET'} game={game} name={name} gauges={gauges} loanAction={loanAction} theme={theme} send={send} />}
@@ -266,6 +278,7 @@ export function App() {
           messengerOpen={messengerOpen} openMessenger={openMessenger} lastChat={lastChat} lastNews={lastNews} dismissNews={dismissNews} />}
         {activeDialog === 'loan' && showLoan &&
           <LoanDialog game={game} send={send} onDismiss={() => setActiveDialog(null)} />}
+        {guideOpen && <GuideDialog onDismiss={() => setGuideOpen(false)} />}
         {activeDialog === 'leave' && room && view !== 'MEETING' &&
           <LeaveDialog game={game} host={host} send={send} onDismiss={() => setActiveDialog(null)} />}
       </div>

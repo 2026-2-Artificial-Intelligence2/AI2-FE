@@ -16,7 +16,15 @@ function SoloDuration({ id, minutes, disabled, onChange }) {
   );
 }
 
-export function Entry({ connected, send, status, account, accountNotice, actionErrors, startingSolo, leaderboard, records, recoveryCode, gameNotice, dismissRecoveryCode }) {
+/** 도움말(게임 방법)을 여는 눈에 띄는 링크. 첫 화면과 대기실에 둔다. */
+function GuideLink({ onClick, children }) {
+  return <button type='button' onClick={onClick} aria-haspopup='dialog'
+    className='guide-link mt-3 inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-bold'>
+    <span aria-hidden='true' className='grid size-5 place-items-center rounded-full text-xs'>?</span>{children} →
+  </button>;
+}
+
+export function Entry({ onGuide, connected, send, status, account, accountNotice, actionErrors, startingSolo, leaderboard, records, recoveryCode, gameNotice, dismissRecoveryCode }) {
   const [mode, setMode] = useState('TEAM');
   const [minutes, setMinutes] = useState(10);
   const requested = useRef(false);
@@ -42,6 +50,7 @@ export function Entry({ connected, send, status, account, accountNotice, actionE
           <div>
             <h2 id='entry-title' className='text-3xl font-extrabold tracking-tight'>사무실 입장</h2>
             <p className='mt-2 text-sm leading-relaxed text-ui-secondary'>부장님 몰래 주식으로 퇴근 전까지 순자산을 불려요.</p>
+            {onGuide && <GuideLink onClick={onGuide}>처음이라면? 게임 방법 보기</GuideLink>}
             {status && <p id='status' role='status' className='mt-2 text-xs text-ui-secondary'>{status}</p>}
           </div>
 
@@ -321,7 +330,7 @@ function RoomSettings({ sessionSeconds, host, connected, lengthError, startError
   );
 }
 
-export function Lobby({ game, host, send, messenger }) {
+export function Lobby({ game, host, send, messenger, onGuide }) {
   const { room, connected, status, actionErrors } = game;
   return (
     <section id='lobby' className={room.solo ? 'mx-auto max-w-2xl' : 'lobby-shell min-w-0'} aria-labelledby='lobby-title'>
@@ -334,6 +343,7 @@ export function Lobby({ game, host, send, messenger }) {
             <p id='status' role='status' className='mt-1 text-sm text-ui-secondary'>
               {status || actionErrors.GENERAL?.message || (room.round > 1 ? room.round + '번째 판 · 시작 대기 중' : '시작 대기 중')}
             </p>
+            {onGuide && <GuideLink onClick={onGuide}>기다리는 동안 게임 방법 보기</GuideLink>}
           </div>
           {!room.solo && <InviteCode code={room.code} />}
         </header>
