@@ -7,7 +7,7 @@ const voiceVolume = personal => personal * finalLevel(soundSettings(), 'voice');
 // 음성 대화(WebRTC). 음성은 브라우저끼리 직접 주고받고, 서버는 연결 정보(offer·answer·ICE 후보)만 전달한다.
 // 같은 방에서 음성에 참여한 사람과 한 명씩 연결한다(메시). 두 사람 중 이름이 사전순으로 앞서는 쪽이 연결을 제안해
 // 양쪽이 동시에 제안하는 충돌을 막는다. 서버 규약은 AI2-BE의 PROTOCOL.md "음성 대화"에 있다.
-// STUN·TURN 서버는 음성 참여 때 서버가 voiceConfig로 알려 준다. 휴대폰 데이터망처럼 직접 연결이 막힌 곳에서는
+// STUN·TURN 서버는 음성 참여 때 서버가 voiceConfig로 알려 준다(지금은 TURN을 쓰지 않아 와이파이에서만 된다). 휴대폰 데이터망처럼 직접 연결이 막힌 곳에서는
 // TURN(중계)이 있어야 목소리가 오간다. 받기 전까지는 공개 STUN만 쓴다.
 const defaultIceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
 // 주소 끝에 ?relay=1을 붙이면 중계(TURN)로만 연결한다. TURN 설정이 맞는지 시험할 때 쓴다.
