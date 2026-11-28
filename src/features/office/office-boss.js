@@ -160,8 +160,8 @@ export function makeSpeech(root) {
     texture.colorSpace = THREE.SRGBColorSpace;
     sprite.material.map = texture;
     sprite.material.needsUpdate = true;
-    // 월드 크기: 한 줄 높이 약 0.23 m(멀리 있어도 읽히게).
-    const metres = 0.23 / lineHeight;
+    // 월드 크기: 한 줄 높이 약 0.15 m(멀리 있어도 읽히게).
+    const metres = 0.15 / lineHeight;
     sprite.scale.set(canvas.width * metres, canvas.height * metres, 1);
   }
 
