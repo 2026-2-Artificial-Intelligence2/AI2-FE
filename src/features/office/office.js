@@ -4,6 +4,7 @@ import {BOSS, glbActor} from '../../shared/scene/glb-actor.js';
 import {BOSS_DESK, OFFICE_SEATS as seats, STAFF} from '../../shared/scene/office-seats.js';
 import {DESK_DROP, OFFICE_CENTER_X, OFFICE_HALF_DEPTH, OFFICE_LENGTH, SUN_PATH, furnish} from './furnishings.js';
 import {fitDeskWorker} from './office-seating.js';
+import {alongPath, bossPath, holdPhone, makePhone, makeSpeech, pathLength} from './office-boss.js';
 import {turnListener} from '../../shared/audio/spatial-audio.js';
 import {addMeetingWindow} from './office-meeting-window.js';
 import {finishFloor, finishWalls} from './office-walls.js';
@@ -15,7 +16,7 @@ const SUN_COLOR = [[0, [1, 0.9, 0.78]], [0.3, [1, 0.92, 0.8]], [0.6, [1, 0.86, 0
 const SKY_INTENSITY = [[0, 2.65], [0.3, 2.8], [0.7, 2.6], [1, 2.0]];
 import {makeVoiceTextures, voiceArcCount} from './office-voice.js';
 
-let scene, camera, renderer, boss, latest, canvas, meetingWindow, updateSky, sun, sky;
+let scene, camera, renderer, boss, bossPhone, bossSpeech, phoneAmount = 0, latest, canvas, meetingWindow, updateSky, sun, sky;
 let timeOfDay;
 let yaw=0, pitch=0, self=-1;
 let focus = false;
@@ -91,6 +92,8 @@ function init() {
     scene.add(person.root);
   }
   boss=glbActor(BOSS);
+  bossPhone=makePhone(boss.root);
+  bossSpeech=makeSpeech(boss.root);
   scene.add(boss.root);
   return { ...furniture, dispose() { furniture.dispose(); unfinishWalls(); unfinishFloor(); } };
 }
@@ -129,11 +132,13 @@ function poseWorker(person, name, time, dt) {
 // so the feet do not slide, and alternate a plain walk with a look-around walk.
 const BOSS_WALK_SPEED = 0.48;
 let bossBeat = 0, bossBeatStarted;
-function poseBoss(walking, step, beatStarted, dt, seated) {
+function poseBoss(walking, path, beatStarted, dt, seated, phone) {
   if (!boss.ready) return;
   if (seated) {
     boss.play('Sit (desk)', { fade: 0.35 });
     boss.mixer.update(dt);
+    phoneAmount = 0;
+    holdPhone(boss, bossPhone.phone, 0);
     return;
   }
   if (beatStarted !== bossBeatStarted) {
@@ -141,13 +146,16 @@ function poseBoss(walking, step, beatStarted, dt, seated) {
     bossBeat += 1;
   }
   if (walking) {
-    const distance = Math.hypot(step.to.x - step.from.x, step.to.z - step.from.z);
-    const timeScale = THREE.MathUtils.clamp(distance / 2 / BOSS_WALK_SPEED, 0.6, 1.8);
-    boss.play(bossBeat % 3 === 2 ? 'Walk look around (loop)' : 'Walk (loop)', { fade: 0.3, timeScale });
+    const timeScale = THREE.MathUtils.clamp(pathLength(path) / 2 / BOSS_WALK_SPEED, 0.6, 1.8);
+    // 휴대폰을 볼 때는 두리번거리지 않는다.
+    boss.play(!phone && bossBeat % 3 === 2 ? 'Walk look around (loop)' : 'Walk (loop)', { fade: 0.3, timeScale });
   } else {
     boss.play('Stand (idle)', { fade: 0.35 });
   }
   boss.mixer.update(dt);
+  // 걸으면서 매매할 때는 휴대폰을 꺼내 보며 중얼거린다(서버가 혼잣말을 보내는 동안).
+  phoneAmount = reduceMotion ? Number(phone) : THREE.MathUtils.damp(phoneAmount, phone ? 1 : 0, 6, dt);
+  holdPhone(boss, bossPhone.phone, phoneAmount);
 }
 
 export function updateOffice(context) {
@@ -211,14 +219,19 @@ function draw(now) {
   if (seated) {
     boss.root.position.set(BOSS_DESK.x, 0, BOSS_DESK.z);
     boss.root.rotation.y = BOSS_DESK.facing;
-  } else {
-    boss.root.position.set(THREE.MathUtils.lerp(step.from.x,step.to.x,t),0,THREE.MathUtils.lerp(step.from.z,step.to.z,t));
-    if (walking) boss.root.rotation.y=Math.atan2(step.to.x-step.from.x,step.to.z-step.from.z);
+  }
+  const path = bossPath(step.from, step.to);
+  if (!seated) {
+    const spot = alongPath(path, t);
+    boss.root.position.set(spot.x, 0, spot.z);
+    if (walking && spot.heading !== null) boss.root.rotation.y = spot.heading;
   }
   // Until the server publishes actual boss presence, avoid showing a stationary boss during lunch.
   boss.root.visible=boss.ready && meeting === undefined &&
     (walking || !(packet.lunchStartsInSeconds<=0 && packet.lunchEndsInSeconds>0));
-  poseBoss(walking && t<1, step, beatStarted, dt, seated);
+  const line = packet.boss?.line;
+  poseBoss(walking && t<1, path, beatStarted, dt, seated, Boolean(line) && !seated);
+  bossSpeech.update(boss.root.visible && zoom < 1 ? line : null, seated ? 1.62 : 1.95);
   renderer.render(scene,camera);
 }
 
@@ -246,6 +259,8 @@ export function mountOffice(element) {
     });
     workers.forEach(person => { person.voice.material.dispose(); person.dispose(); });
     boss.dispose();
+    bossPhone.dispose();
+    bossSpeech.dispose();
     meetingWindow.dispose();
     voiceTextures.forEach(texture => texture.dispose());
     renderer.dispose();

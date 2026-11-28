@@ -5,7 +5,6 @@ import { useVoice } from './use-voice.js';
 import { VoicePanel } from './voice-panel.jsx';
 import { SettingsPanel } from './settings-panel.jsx';
 import { BossNearby } from './boss-nearby.jsx';
-import { BossLine } from './boss-line.jsx';
 import { GameGauges } from './game-gauges.jsx';
 import { enableSound, sfx } from '../shared/audio/spatial-audio.js';
 import { duckMusic, setMusic } from '../shared/audio/music.js';
@@ -258,9 +257,8 @@ export function App() {
         {result && <Results result={result} name={name} host={host} solo={solo} connected={connected} send={send} restartError={actionErrors.RESTART?.message} />}
         {!inLobby && messenger}
         {computer && desktopShown && <BossNearby market={market} />}
-        {computer && desktopShown && <BossLine market={market} />}
         {computer && desktopShown && <Notifications game={game} inbox={inbox} toggleInbox={toggleInbox}
-          messengerOpen={messengerOpen} openMessenger={openMessenger} lastChat={lastChat} lastNews={lastNews} dismissNews={dismissNews} />}
+          messengerOpen={messengerOpen} openMessenger={openMessenger} lastChat={lastChat} lastNews={lastNews} dismissNews={dismissNews} boss={market?.boss} />}
         {activeDialog === 'loan' && showLoan &&
           <LoanDialog game={game} send={send} onDismiss={() => setActiveDialog(null)} />}
         {activeDialog === 'leave' && room && view !== 'MEETING' &&

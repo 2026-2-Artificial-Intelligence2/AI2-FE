@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { clock } from '../shared/format.js';
 import { KeyHint } from '../shared/ui/shortcuts.jsx';
 import { Icon, faEnvelope, faNewspaper } from '../shared/ui/icon.jsx';
+import { BossLine } from './boss-line.jsx';
 
 function Bubble({ label, hint, icon, count, expanded, onClick }) {
   return <button type="button" aria-label={label} aria-keyshortcuts={hint} aria-expanded={expanded}
@@ -12,7 +13,7 @@ function Bubble({ label, hint, icon, count, expanded, onClick }) {
   </button>;
 }
 
-export function Notifications({ game, inbox, toggleInbox, messengerOpen, openMessenger, lastChat, lastNews, dismissNews }) {
+export function Notifications({ game, inbox, toggleInbox, messengerOpen, openMessenger, lastChat, lastNews, dismissNews, boss }) {
   const [preview, setPreview] = useState(null);
   const solo = Boolean(game.room?.solo);
   const chat = game.chats.findLast(item => item.id > Math.max(lastChat, game.chatHistoryEnd ?? 0) &&
@@ -57,6 +58,7 @@ export function Notifications({ game, inbox, toggleInbox, messengerOpen, openMes
         </ul> : <p className="px-1 py-2 text-sm text-ui-secondary">아직 발표된 뉴스가 없습니다.</p>}
       </div>
     </section>}
+    {!inbox && <BossLine boss={boss} />}
     <div className="flex items-end gap-2">
       {news && !inbox && <div id="news" role="status" className="notification-preview notification-preview--news relative w-[min(22rem,calc(100vw-5rem))] pr-10">
         <b className="block text-sm">{news.kind === 'rumor' ? '찌라시' : '속보'} · {news.headline}</b>

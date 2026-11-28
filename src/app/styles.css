@@ -146,6 +146,7 @@
   }
   .notification-preview--news { border-left-color: var(--preview-news); }
   .notification-preview--chat { border-left-color: var(--preview-chat); }
+  .notification-preview--boss { border-left-color: #d97706; }
   button.notification-preview:hover { background: var(--preview-hover); }
 }
 
